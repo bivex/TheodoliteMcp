@@ -11,6 +11,17 @@ import textwrap
 from .models import PlotPlan, Point, Zone
 from .logic import calculate_azimuth_from_points, calculate_area
 
+# ISO 128-23:1999 Line Width Groups (0.7 Group chosen as default)
+LW_NARROW = 0.35
+LW_WIDE = 0.7
+LW_EXTRA_WIDE = 1.4
+
+# ISO 128-23 Line Types
+LINE_CONTINUOUS = "-"
+LINE_DASHED = "--"
+LINE_LONG_DASH_DOT = (0, (8, 2, 1, 2))  # Type 04 (approximate)
+LINE_LONG_DASH_DOUBLE_DOT = (0, (8, 2, 1, 2, 1, 2))  # Type 05 (approximate)
+
 # Localization Dictionary
 I18N: Dict[str, Dict[str, str]] = {
     "ru": {
@@ -99,21 +110,32 @@ def _get_hatch(name: str) -> Optional[str]:
     if any(k in name for k in ['парковка', 'parking', 'paving', 'дорожка']): return 'xxx'
     return None
 
-def _draw_boundary(ax, points: List[Point], color: str = 'black', linewidth: float = 2.0):
+def _draw_boundary(ax, points: List[Point], color: str = 'black'):
+    # ISO 128-23: 01.3 Continuous extra-wide line for lines of special importance/outlines
     xs, ys = _polygon_coords(points)
-    ax.plot(xs, ys, color=color, linewidth=linewidth, zorder=3)
+    ax.plot(xs, ys, color=color, linewidth=LW_EXTRA_WIDE, linestyle=LINE_CONTINUOUS, zorder=3)
 
 def _draw_zones(ax, zones: List[Zone]):
     for i, zone in enumerate(zones):
         color = zone.fill_color or _auto_color(i)
         hatch = _get_hatch(zone.name)
         xs, ys = _polygon_coords(zone.points)
-        ax.fill(xs, ys, color=color, alpha=0.2, zorder=1)
+        ax.fill(xs, ys, color=color, alpha=0.15, zorder=1)
         if hatch:
-            ax.fill(xs, ys, fill=False, hatch=hatch, edgecolor='black', linewidth=0, alpha=0.2, zorder=2)
+            ax.fill(xs, ys, fill=False, hatch=hatch, edgecolor='black', linewidth=0, alpha=0.1, zorder=2)
+        
         is_building = any(k in zone.name.lower() for k in ['дом', 'здание', 'building', 'house'])
-        lw = 1.2 if is_building else 0.6
-        ax.plot(xs, ys, color='black', linewidth=lw, linestyle='-', zorder=3)
+        
+        if is_building:
+            # ISO 128-23: 01.2 Continuous wide line for visible outlines in cut/section
+            lw = LW_WIDE
+            ls = LINE_CONTINUOUS
+        else:
+            # ISO 128-23: 04.3 Long dashed dotted extra-wide line for boundary lines of zones
+            lw = LW_EXTRA_WIDE
+            ls = LINE_LONG_DASH_DOT
+            
+        ax.plot(xs, ys, color='black', linewidth=lw, linestyle=ls, zorder=3)
         zx, zy = _centroid(zone.points)
         ax.text(zx, zy, str(i + 1), fontsize=9, fontweight='bold', ha='center', va='center', zorder=10,
                 bbox=dict(boxstyle='circle,pad=0.2', facecolor='white', edgecolor='black', alpha=0.8))
@@ -127,20 +149,25 @@ def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8):
         ax.text(p.x + offset_x, p.y + offset_y, p.name, fontsize=fontsize, ha='center', va='center', zorder=5)
 
 def _draw_distances(ax, points: List[Point], fontsize: float = 7):
+    # ISO 128-23: 01.1 Continuous narrow line for dimension lines
     for i in range(len(points)):
         p1, p2 = points[i], points[(i + 1) % len(points)]
         dist = math.hypot(p2.x - p1.x, p2.y - p1.y)
         if dist < 0.1: continue
         mx, my = _edge_midpoint(p1, p2)
         ox_line, oy_line = _perpendicular_offset(p1, p2, distance=3.0)
-        ax.plot([p1.x + ox_line, p2.x + ox_line], [p1.y + oy_line, p2.y + oy_line], color='black', linewidth=0.5, zorder=4)
-        ax.plot([p1.x, p1.x + ox_line * 1.1], [p1.y, p1.y + oy_line * 1.1], color='black', linewidth=0.4, zorder=4)
-        ax.plot([p2.x, p2.x + ox_line * 1.1], [p2.y, p2.y + oy_line * 1.1], color='black', linewidth=0.4, zorder=4)
+        
+        # Dimension lines (Narrow)
+        ax.plot([p1.x + ox_line, p2.x + ox_line], [p1.y + oy_line, p2.y + oy_line], color='black', linewidth=LW_NARROW, zorder=4)
+        ax.plot([p1.x, p1.x + ox_line * 1.1], [p1.y, p1.y + oy_line * 1.1], color='black', linewidth=LW_NARROW, zorder=4)
+        ax.plot([p2.x, p2.x + ox_line * 1.1], [p2.y, p2.y + oy_line * 1.1], color='black', linewidth=LW_NARROW, zorder=4)
+        
         tick_len = 0.6
         for p in [(p1.x + ox_line, p1.y + oy_line), (p2.x + ox_line, p2.y + oy_line)]:
             angle = math.atan2(p2.y - p1.y, p2.x - p1.x) + math.pi/4
             tx, ty = math.cos(angle) * tick_len, math.sin(angle) * tick_len
-            ax.plot([p[0] - tx, p[0] + tx], [p[1] - ty, p[1] + ty], color='black', linewidth=0.8, zorder=5)
+            ax.plot([p[0] - tx, p[0] + tx], [p[1] - ty, p[1] + ty], color='black', linewidth=LW_WIDE, zorder=5)
+            
         angle = math.degrees(math.atan2(p2.y - p1.y, p2.x - p1.x))
         if angle > 90: angle -= 180
         if angle < -90: angle += 180
@@ -217,11 +244,15 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     ax.set_xlim(x_min - x_span*0.25, x_max + x_span*0.25)
     ax.set_ylim(y_min - y_span*0.25, y_max + y_span*0.25)
     ax.set_aspect('equal')
-    ax.grid(True, which='both', color='#EEEEEE', linestyle='-', linewidth=0.3, zorder=0)
+    
+    # ISO 128-23: Narrow line for grid
+    ax.grid(True, which='both', color='#EEEEEE', linestyle=LINE_CONTINUOUS, linewidth=LW_NARROW, zorder=0)
     ax.tick_params(labelsize=7)
     ax.set_xlabel("X (m)", fontsize=7, style='italic'); ax.set_ylabel("Y (m)", fontsize=7, style='italic')
+    
     if plan.zones: _draw_zones(ax, plan.zones)
-    _draw_boundary(ax, plan.boundary_points, linewidth=1.5)
+    _draw_boundary(ax, plan.boundary_points)
+    
     if plan.show_vertex_labels: _draw_vertex_labels(ax, plan.boundary_points)
     if plan.show_distances: _draw_distances(ax, plan.boundary_points)
     _draw_north_arrow(ax, lang=lang)
