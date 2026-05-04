@@ -28,6 +28,31 @@ def calculate_azimuth_from_points(p1: Point, p2: Point) -> float:
     azimuth = math.degrees(math.atan2(dy, dx))
     return normalize_angle(azimuth)
 
+def calculate_area(points: List[Point]) -> float:
+    """Calculates area using the Shoelace formula (Gauss area formula)."""
+    if len(points) < 3:
+        return 0.0
+    
+    # Area = 0.5 * |sum(Xi * Yi+1 - Xi+1 * Yi)|
+    area = 0.0
+    n = len(points)
+    for i in range(n):
+        j = (i + 1) % n
+        area += (points[i].x * points[j].y)
+        area -= (points[j].x * points[i].y)
+    return abs(area) / 2.0
+
+def evaluate_precision(relative_error: float) -> str:
+    if relative_error <= 0:
+        return "Perfect (Theoretical)"
+    inv_error = 1.0 / relative_error
+    if inv_error >= 5000:
+        return f"Excellent (1:{int(inv_error)})"
+    elif inv_error >= 2000:
+        return f"Satisfactory (1:{int(inv_error)})"
+    else:
+        return f"Unacceptable (1:{int(inv_error)}) - Re-measurement recommended"
+
 def calculate_traverse(data: TraverseData) -> TraverseResult:
     n = len(data.observations)
     if n < 1:
@@ -111,10 +136,22 @@ def calculate_traverse(data: TraverseData) -> TraverseResult:
         curr_y += dys[i]
         points.append(Point(name=data.observations[i].point_name, x=curr_x, y=curr_y))
 
+    # 7. Area Calculation (if closed)
+    area = None
+    if data.is_closed:
+        # For area, we exclude the duplicated closing point if it exists
+        unique_points = points[:-1] if len(points) > 1 else points
+        area = calculate_area(unique_points)
+
+    # 8. Precision Evaluation
+    status = evaluate_precision(relative_precision)
+
     return TraverseResult(
         points=points,
         angular_misclosure=angular_misclosure,
         linear_misclosure=linear_misclosure,
         relative_precision=relative_precision,
-        total_length=total_dist
+        total_length=total_dist,
+        area=area,
+        precision_status=status
     )

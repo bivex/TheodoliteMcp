@@ -3,13 +3,26 @@
 An MCP server for processing theodolite survey field books (traverse adjustment and coordinate calculation).
 
 ## Features
-- Traverse adjustment (Angular and Linear misclosure)
-- Compass Rule adjustment
-- Coordinate calculation
-- Azimuth calculation
-- DMS to Decimal degree conversion
+- **Traverse Adjustment:** Angular and Linear misclosure adjustment (Compass Rule).
+- **Coordinate Calculation:** X (North), Y (East) generation.
+- **Area Calculation:** Automatic area calculation for closed traverses using the Gauss formula.
+- **Precision Validation:** Automated status report based on industrial standards (1:2000, 1:5000).
+- **Surveying Utilities:** Azimuth calculation, DMS/Decimal conversions.
 
-## Installation
+## Demonstration Task
+The repository includes `demo_task.py`, which showcases a real-world scenario: **Planning a construction site.**
+
+It performs the following steps:
+1. Converts field DMS measurements to decimal degrees.
+2. Processes a closed traverse around a site.
+3. Calculates adjusted coordinates, total area, and misclosure.
+4. Evaluates whether the precision meets professional standards.
+5. Determines the azimuth for building axis orientation.
+
+Run the demo:
+```bash
+PYTHONPATH=src ./venv/bin/python3 demo_task.py
+```
 ```bash
 pip install -e .
 ```

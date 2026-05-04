@@ -24,3 +24,5 @@ class TraverseResult(BaseModel):
     linear_misclosure: float
     relative_precision: float
     total_length: float
+    area: Optional[float] = None
+    precision_status: Optional[str] = None
