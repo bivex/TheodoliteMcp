@@ -110,12 +110,11 @@ def _draw_stamp(fig, title: str, scale_str: str):
     ax_stamp.set_xticks([]); ax_stamp.set_yticks([]); ax_stamp.set_facecolor('white')
     for spine in ax_stamp.spines.values(): spine.set_linewidth(1.5)
     ax_stamp.axhline(0.33, color='black', lw=0.5); ax_stamp.axhline(0.66, color='black', lw=0.5); ax_stamp.axvline(0.3, color='black', lw=0.5)
-    wrapped_title = '
-'.join(textwrap.wrap(title, width=25))
+    wrapped_title = '\n'.join(textwrap.wrap(title, width=25))
     font_props = {'fontsize': 7, 'family': 'sans-serif', 'style': 'italic'}
     ax_stamp.text(0.05, 0.8, 'Проект:', **font_props, va='center')
     ax_stamp.text(0.35, 0.8, wrapped_title, fontsize=8, fontweight='bold', va='center')
-    ax_stamp.text(0.05, 0.5, 'Стадия:', **font_props, va=center)
+    ax_stamp.text(0.05, 0.5, 'Стадия:', **font_props, va="center")
     ax_stamp.text(0.35, 0.5, 'Чертеж (П)', fontsize=8, va='center')
     ax_stamp.text(0.05, 0.15, 'Масштаб:', **font_props, va='center')
     ax_stamp.text(0.35, 0.15, scale_str, fontsize=8, va='center')
