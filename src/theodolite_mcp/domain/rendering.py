@@ -1,6 +1,6 @@
 import io
 import math
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib.figure import Figure
@@ -10,6 +10,55 @@ import textwrap
 
 from .models import PlotPlan, Point, Zone
 from .logic import calculate_azimuth_from_points, calculate_area
+
+# Localization Dictionary
+I18N: Dict[str, Dict[str, str]] = {
+    "ru": {
+        "project": "Проект:",
+        "stage": "Стадия:",
+        "scale": "Масштаб:",
+        "draft": "Чертеж (П)",
+        "explication": "ЭКСПЛИКАЦИЯ ЗОН",
+        "total_area": "Общая площадь:",
+        "sotki": "сот.",
+        "num": "№",
+        "name": "Наименование",
+        "area_sqm": "S, м²",
+        "north": "С",
+        "others": "... и другие",
+        "unit_m": "м"
+    },
+    "uk": {
+        "project": "Проєкт:",
+        "stage": "Стадія:",
+        "scale": "Масштаб:",
+        "draft": "Креслення (П)",
+        "explication": "ЕКСПЛІКАЦІЯ ЗОН",
+        "total_area": "Загальна площа:",
+        "sotki": "сот.",
+        "num": "№",
+        "name": "Найменування",
+        "area_sqm": "S, м²",
+        "north": "Пн",
+        "others": "... та інші",
+        "unit_m": "м"
+    },
+    "en": {
+        "project": "Project:",
+        "stage": "Stage:",
+        "scale": "Scale:",
+        "draft": "Draft (P)",
+        "explication": "ZONE EXPLICATION",
+        "total_area": "Total Area:",
+        "sotki": "units",
+        "num": "No.",
+        "name": "Description",
+        "area_sqm": "S, m²",
+        "north": "N",
+        "others": "... and others",
+        "unit_m": "m"
+    }
+}
 
 ZONE_COLORS = [
     '#F5F5DC', '#E8F5E9', '#FFF3E0', '#E3F2FD',
@@ -44,10 +93,10 @@ def _perpendicular_offset(p1: Point, p2: Point, distance: float = 1.0) -> Tuple[
 
 def _get_hatch(name: str) -> Optional[str]:
     name = name.lower()
-    if any(k in name for k in ['дом', 'хозблок', 'здание', 'строение']): return '///'
-    if any(k in name for k in ['огород', 'теплица', 'ягодник']): return '...'
-    if any(k in name for k in ['сад', 'парк', 'цветник']): return 'oo'
-    if any(k in name for k in ['парковка', 'дорожка', 'въезд']): return 'xxx'
+    if any(k in name for k in ['дом', 'house', 'building', 'здание']): return '///'
+    if any(k in name for k in ['огород', 'garden', 'planting', 'теплица']): return '...'
+    if any(k in name for k in ['сад', 'orchard', 'trees', 'цветник']): return 'oo'
+    if any(k in name for k in ['парковка', 'parking', 'paving', 'дорожка']): return 'xxx'
     return None
 
 def _draw_boundary(ax, points: List[Point], color: str = 'black', linewidth: float = 2.0):
@@ -62,7 +111,7 @@ def _draw_zones(ax, zones: List[Zone]):
         ax.fill(xs, ys, color=color, alpha=0.2, zorder=1)
         if hatch:
             ax.fill(xs, ys, fill=False, hatch=hatch, edgecolor='black', linewidth=0, alpha=0.2, zorder=2)
-        is_building = any(k in zone.name.lower() for k in ['дом', 'здание', 'хозблок'])
+        is_building = any(k in zone.name.lower() for k in ['дом', 'здание', 'building', 'house'])
         lw = 1.2 if is_building else 0.6
         ax.plot(xs, ys, color='black', linewidth=lw, linestyle='-', zorder=3)
         zx, zy = _centroid(zone.points)
@@ -105,36 +154,38 @@ def _calculate_auto_scale(x_span: float, width_inches: float) -> str:
         if s >= raw_scale: return f'1:{s}'
     return f'1:{int(raw_scale)}'
 
-def _draw_stamp(fig, title: str, scale_str: str):
+def _draw_stamp(fig, title: str, scale_str: str, lang: str = "ru"):
+    texts = I18N.get(lang, I18N["ru"])
     ax_stamp = fig.add_axes([0.65, 0.05, 0.3, 0.15])
     ax_stamp.set_xticks([]); ax_stamp.set_yticks([]); ax_stamp.set_facecolor('white')
     for spine in ax_stamp.spines.values(): spine.set_linewidth(1.5)
     ax_stamp.axhline(0.33, color='black', lw=0.5); ax_stamp.axhline(0.66, color='black', lw=0.5); ax_stamp.axvline(0.3, color='black', lw=0.5)
     wrapped_title = '\n'.join(textwrap.wrap(title, width=25))
     font_props = {'fontsize': 7, 'family': 'sans-serif', 'style': 'italic'}
-    ax_stamp.text(0.05, 0.8, 'Проект:', **font_props, va='center')
+    ax_stamp.text(0.05, 0.8, texts["project"], **font_props, va='center')
     ax_stamp.text(0.35, 0.8, wrapped_title, fontsize=8, fontweight='bold', va='center')
-    ax_stamp.text(0.05, 0.5, 'Стадия:', **font_props, va="center")
-    ax_stamp.text(0.35, 0.5, 'Чертеж (П)', fontsize=8, va='center')
-    ax_stamp.text(0.05, 0.15, 'Масштаб:', **font_props, va='center')
+    ax_stamp.text(0.05, 0.5, texts["stage"], **font_props, va="center")
+    ax_stamp.text(0.35, 0.5, texts["draft"], fontsize=8, va='center')
+    ax_stamp.text(0.05, 0.15, texts["scale"], **font_props, va='center')
     ax_stamp.text(0.35, 0.15, scale_str, fontsize=8, va='center')
 
-def _draw_explication(fig, zones: List[Zone], total_area: float):
+def _draw_explication(fig, zones: List[Zone], total_area: float, lang: str = "ru"):
+    texts = I18N.get(lang, I18N["ru"])
     ax_leg = fig.add_axes([0.05, 0.05, 0.35, 0.25])
     ax_leg.set_axis_off()
     font_props = {'family': 'sans-serif', 'style': 'italic'}
     y_pos = 0.95
-    ax_leg.text(0, y_pos, 'ЭКСПЛИКАЦИЯ ЗОН', fontsize=9, fontweight='bold', **font_props)
+    ax_leg.text(0, y_pos, texts["explication"], fontsize=9, fontweight='bold', **font_props)
     y_pos -= 0.1
-    ax_leg.text(0, y_pos, f'Общая площадь: {total_area:.1f} м² ({total_area/100:.2f} сот.)', fontsize=8, fontweight='bold', **font_props)
+    ax_leg.text(0, y_pos, f"{texts['total_area']} {total_area:.1f} м² ({total_area/100:.2f} {texts['sotki']})", fontsize=8, fontweight='bold', **font_props)
     y_pos -= 0.1
-    ax_leg.text(0, y_pos, '№', fontsize=7, fontweight='bold', **font_props)
-    ax_leg.text(0.1, y_pos, 'Наименование', fontsize=7, fontweight='bold', **font_props)
-    ax_leg.text(0.7, y_pos, 'S, м²', fontsize=7, fontweight='bold', **font_props)
+    ax_leg.text(0, y_pos, texts["num"], fontsize=7, fontweight='bold', **font_props)
+    ax_leg.text(0.1, y_pos, texts["name"], fontsize=7, fontweight='bold', **font_props)
+    ax_leg.text(0.7, y_pos, texts["area_sqm"], fontsize=7, fontweight='bold', **font_props)
     y_pos -= 0.08
     for i, zone in enumerate(zones):
         if y_pos < 0.05:
-            ax_leg.text(0, y_pos, '... и другие', fontsize=7, fontstyle='italic')
+            ax_leg.text(0, y_pos, texts["others"], fontsize=7, fontstyle='italic')
             break
         area = calculate_area(zone.points) or 0
         ax_leg.text(0, y_pos, str(i + 1), fontsize=7, **font_props)
@@ -142,15 +193,17 @@ def _draw_explication(fig, zones: List[Zone], total_area: float):
         ax_leg.text(0.7, y_pos, f'{area:.1f}', fontsize=7, **font_props)
         y_pos -= 0.06
 
-def _draw_north_arrow(ax):
+def _draw_north_arrow(ax, lang: str = "ru"):
+    texts = I18N.get(lang, I18N["ru"])
     xlim, ylim = ax.get_xlim(), ax.get_ylim()
     x, y = xlim[0] + (xlim[1] - xlim[0]) * 0.05, ylim[1] - (ylim[1] - ylim[0]) * 0.1
     arrow_len = (ylim[1] - ylim[0]) * 0.08
     ax.annotate('', xy=(x, y + arrow_len), xytext=(x, y), arrowprops=dict(arrowstyle='fancy', color='black'))
-    ax.text(x, y + arrow_len + arrow_len*0.2, 'С', fontsize=10, fontweight='bold', ha='center')
+    ax.text(x, y + arrow_len + arrow_len*0.2, texts["north"], fontsize=10, fontweight='bold', ha='center')
 
 def render_plot_plan(plan: PlotPlan) -> bytes:
     dpi = plan.dpi if plan.dpi >= 150 else 150
+    lang = plan.language or "ru"
     fig = Figure(figsize=(plan.width_inches, plan.height_inches), dpi=dpi)
     ax = fig.add_axes([0.1, 0.35, 0.8, 0.55])
     all_points = list(plan.boundary_points)
@@ -166,14 +219,15 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     ax.set_aspect('equal')
     ax.grid(True, which='both', color='#EEEEEE', linestyle='-', linewidth=0.3, zorder=0)
     ax.tick_params(labelsize=7)
-    ax.set_xlabel('X (m)', fontsize=7, style='italic'); ax.set_ylabel('Y (m)', fontsize=7, style='italic')
+    ax.set_xlabel("X (m)", fontsize=7, style='italic'); ax.set_ylabel("Y (m)", fontsize=7, style='italic')
     if plan.zones: _draw_zones(ax, plan.zones)
     _draw_boundary(ax, plan.boundary_points, linewidth=1.5)
     if plan.show_vertex_labels: _draw_vertex_labels(ax, plan.boundary_points)
     if plan.show_distances: _draw_distances(ax, plan.boundary_points)
-    _draw_north_arrow(ax)
+    _draw_north_arrow(ax, lang=lang)
+    
     total_area = calculate_area(plan.boundary_points) or 0
-    _draw_explication(fig, plan.zones, total_area)
-    _draw_stamp(fig, plan.title, scale_str)
+    _draw_explication(fig, plan.zones, total_area, lang=lang)
+    _draw_stamp(fig, plan.title, scale_str, lang=lang)
     buf = io.BytesIO(); fig.savefig(buf, format='png', dpi=dpi, facecolor='white'); buf.seek(0)
     return buf.getvalue()

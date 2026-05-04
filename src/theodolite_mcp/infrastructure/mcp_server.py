@@ -136,6 +136,7 @@ def draw_plot_plan(
     title: str = "Cadastral Plan",
     boundary_json: list[dict] = [],
     zones_json: list[dict] = [],
+    language: str = "ru",
     show_vertex_labels: bool = True,
     show_distances: bool = True,
     show_azimuths: bool = True,
@@ -147,7 +148,7 @@ def draw_plot_plan(
     dpi: int = 150,
 ) -> Image:
     """
-    Generate a visual cadastral/site plan showing land plot boundaries,
+    Generate a visual cadastral/site plan showing land plot boundaries, 
     zone areas, distance labels, azimuth labels, north arrow, and scale bar.
     Returns a PNG image.
     """
@@ -165,6 +166,7 @@ def draw_plot_plan(
         title=title,
         boundary_points=boundary_points,
         zones=zones,
+        language=language,
         show_vertex_labels=show_vertex_labels,
         show_distances=show_distances,
         show_azimuths=show_azimuths,
@@ -175,6 +177,7 @@ def draw_plot_plan(
         height_inches=height,
         dpi=dpi,
     )
+
     png_bytes = service.render_plot(plan)
     return Image(data=png_bytes, format="png")
 

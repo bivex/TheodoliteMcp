@@ -64,6 +64,7 @@ class PlotPlan(BaseModel):
     title: str = "Cadastral Plan"
     boundary_points: List[Point]
     zones: List[Zone] = []
+    language: str = "ru"  # "ru" or "en"
     show_vertex_labels: bool = True
     show_distances: bool = True
     show_azimuths: bool = True
