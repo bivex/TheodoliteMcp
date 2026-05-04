@@ -81,8 +81,17 @@ I18N: Dict[str, Dict[str, str]] = {
         "area_sqm": "S, m²",
         "north": "N",
         "others": "... and others",
-        "unit_m": "m"
+        "unit_m": "m",
+        "bow": "BOW",
+        "stern": "STERN"
     }
+}
+
+SHIP_SYMBOLS = {
+    "cl": "CL", # Center Line
+    "bl": "BL", # Base Line
+    "wl": "WL", # Water Line
+    "fr": "FR"  # Frame
 }
 
 ZONE_COLORS = [
@@ -235,24 +244,25 @@ def _draw_leader(ax, target_x: float, target_y: float, text: str,
     ax.text(lx + shelf_dir * shelf_len/2, ly + 2*d_m, text, 
             fontsize=fontsize, ha='center', va='bottom', zorder=10)
 
-def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8):
+def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8, standard: str = "construction"):
     cx, cy = _centroid(points)
     for p in points:
+        name = p.name
+        if standard == "shipbuilding" and name.isdigit():
+            name = f"FR{name}"
+            
         dx, dy = p.x - cx, p.y - cy
         dist = math.hypot(dx, dy)
         offset_x, offset_y = (dx / dist * 1.6, dy / dist * 1.6) if dist > 0 else (1.6, 1.6)
-        ax.text(p.x + offset_x, p.y + offset_y, p.name, fontsize=fontsize, ha='center', va='center', zorder=5)
+        ax.text(p.x + offset_x, p.y + offset_y, name, fontsize=fontsize, ha='center', va='center', zorder=5)
 
 def _draw_distances(ax, points: List[Point], standard: str = "construction", fontsize: float = 7, show_azimuths: bool = False, m_per_pt: float = 0.1):
-    # ISO 128-23 / ISO 129-1 / ISO 129-4
-    # Line width D is in points. 
-    # Extension lines shall extend approx 8 * line width beyond dimension line.
-    overshoot = 8 * (D / MM_TO_PT) * (MM_TO_PT * m_per_pt) # simplified: 8 * D * m_per_pt
-    overshoot = 8 * D * m_per_pt
-    gap = 2 * D * m_per_pt # Small gap from feature
-    text_offset = 1.2 * MM_TO_PT * m_per_pt # ~1.2mm above line
+    # Calculate centroid to determine 'inside' direction
+    cx, cy = _centroid(points)
     
-    # Distance from object to dimension line (standard suggests ~7-10mm, let's use 8mm)
+    overshoot = 8 * D * m_per_pt
+    gap = 2 * D * m_per_pt
+    text_offset = 1.2 * MM_TO_PT * m_per_pt
     dim_offset_m = 8.0 * MM_TO_PT * m_per_pt
 
     for i in range(len(points)):
@@ -263,15 +273,22 @@ def _draw_distances(ax, points: List[Point], standard: str = "construction", fon
         mx, my = _edge_midpoint(p1, p2)
         ox_unit, oy_unit = _perpendicular_offset(p1, p2, distance=1.0)
         
-        # Dimension line positions
+        # ISO 129-1: Dimensions should be outside. 
+        # Check if (mx + ox_unit, my + oy_unit) is closer to centroid than (mx, my)
+        dist_to_centroid_before = math.hypot(mx - cx, my - cy)
+        dist_to_centroid_after = math.hypot(mx + ox_unit - cx, my + oy_unit - cy)
+        
+        if dist_to_centroid_after < dist_to_centroid_before:
+            # We are pointing inside, flip it
+            ox_unit, oy_unit = -ox_unit, -oy_unit
+            
         ox_line, oy_line = ox_unit * dim_offset_m, oy_unit * dim_offset_m
         
-        # 1. Dimension line (Narrow 01.1)
+        # 1. Dimension line
         ax.plot([p1.x + ox_line, p2.x + ox_line], [p1.y + oy_line, p2.y + oy_line], 
                 color='black', linewidth=D, linestyle=TYPE_01, zorder=4)
         
-        # 2. Extension lines (Narrow 01.1)
-        # From (p1 + gap) to (p1 + ox_line + overshoot)
+        # 2. Extension lines
         p1_start_x, p1_start_y = p1.x + ox_unit * gap, p1.y + oy_unit * gap
         p1_end_x, p1_end_y = p1.x + ox_line + ox_unit * overshoot, p1.y + oy_line + oy_unit * overshoot
         ax.plot([p1_start_x, p1_end_x], [p1_start_y, p1_end_y], 
@@ -283,21 +300,18 @@ def _draw_distances(ax, points: List[Point], standard: str = "construction", fon
                 color='black', linewidth=D, linestyle=TYPE_01, zorder=4)
         
         if standard == "shipbuilding":
-            # ISO 129-4: Closed 30° arrowheads
             angle = math.atan2(p2.y - p1.y, p2.x - p1.x)
-            # Draw at p1+offset
+            # Arrow scale
+            ascl = 5 * MM_TO_PT * m_per_pt
             ax.annotate("", xy=(p1.x + ox_line, p1.y + oy_line), 
-                        xytext=(p1.x + ox_line + math.cos(angle)*0.01, p1.y + oy_line + math.sin(angle)*0.01),
+                        xytext=(p1.x + ox_line + math.cos(angle)*ascl, p1.y + oy_line + math.sin(angle)*ascl),
                         arrowprops=dict(arrowstyle='-|>', color='black', mutation_scale=10, 
-                                        linewidth=D_WIDE/MM_TO_PT, shrinkA=0, shrinkB=0), zorder=5)
-            # Draw at p2+offset
+                                        linewidth=D/MM_TO_PT, shrinkA=0, shrinkB=0), zorder=5)
             ax.annotate("", xy=(p2.x + ox_line, p2.y + oy_line), 
-                        xytext=(p2.x + ox_line - math.cos(angle)*0.01, p2.y + oy_line - math.sin(angle)*0.01),
+                        xytext=(p2.x + ox_line - math.cos(angle)*ascl, p2.y + oy_line - math.sin(angle)*ascl),
                         arrowprops=dict(arrowstyle='-|>', color='black', mutation_scale=10, 
-                                        linewidth=D_WIDE/MM_TO_PT, shrinkA=0, shrinkB=0), zorder=5)
+                                        linewidth=D/MM_TO_PT, shrinkA=0, shrinkB=0), zorder=5)
         else:
-            # ISO 129-1: Architectural ticks (Wide line 01.2)
-            # Standard ticks are 45 deg, length approx 2-3mm
             tick_len = 2.0 * MM_TO_PT * m_per_pt
             for p_base in [(p1.x + ox_line, p1.y + oy_line), (p2.x + ox_line, p2.y + oy_line)]:
                 t_angle = math.atan2(p2.y - p1.y, p2.x - p1.x) + math.pi/4
@@ -305,17 +319,16 @@ def _draw_distances(ax, points: List[Point], standard: str = "construction", fon
                 ax.plot([p_base[0] - tx, p_base[0] + tx], [p_base[1] - ty, p_base[1] + ty], 
                         color='black', linewidth=D_WIDE, linestyle=TYPE_01, zorder=5)
             
-        # Distance text positioning
         angle_deg = math.degrees(math.atan2(p2.y - p1.y, p2.x - p1.x))
         if angle_deg > 90: angle_deg -= 180
         if angle_deg < -90: angle_deg += 180
         
-        # Text offset (above line)
         tx_off, ty_off = ox_unit * text_offset, oy_unit * text_offset
         
-        # Distance (above line)
+        # Distance (always on top relative to line direction)
         ax.text(mx + ox_line + tx_off, my + oy_line + ty_off, f'{dist:.2f}', 
-                fontsize=fontsize, ha='center', va='bottom', rotation=angle_deg, zorder=10, style='italic')
+                fontsize=fontsize, ha='center', va='bottom', rotation=angle_deg, zorder=10, style='italic',
+                bbox=dict(facecolor='white', edgecolor='none', alpha=0.7, pad=0.1))
         
         # Azimuth (below line)
         if show_azimuths:
@@ -441,7 +454,7 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     if plan.zones: _draw_zones(ax, plan.zones, show_areas=plan.show_areas, standard=plan.standard)
     _draw_boundary(ax, plan.boundary_points, standard=plan.standard)
     
-    if plan.show_vertex_labels: _draw_vertex_labels(ax, plan.boundary_points)
+    if plan.show_vertex_labels: _draw_vertex_labels(ax, plan.boundary_points, standard=plan.standard)
     if plan.show_distances: 
         _draw_distances(ax, plan.boundary_points, standard=plan.standard, fontsize=7.5, 
                         show_azimuths=plan.show_azimuths, m_per_pt=m_per_pt)
@@ -449,7 +462,15 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     if plan.show_scale_bar:
         _draw_scale_bar(ax, x_span, plan.width_inches, lang=lang)
         
-    _draw_north_arrow(ax, lang=lang)
+    if plan.standard == "shipbuilding":
+        # ISO 128-15: STERN left, BOW right
+        texts = I18N.get(lang, I18N["ru"])
+        ax.text(x_min - x_span*0.1, (y_min+y_max)/2, texts.get("stern", "STERN"), 
+                fontsize=9, fontweight='bold', ha='right', va='center', rotation=90)
+        ax.text(x_max + x_span*0.1, (y_min+y_max)/2, texts.get("bow", "BOW"), 
+                fontsize=9, fontweight='bold', ha='left', va='center', rotation=-90)
+    else:
+        _draw_north_arrow(ax, lang=lang)
     
     total_area = calculate_area(plan.boundary_points) or 0
     _draw_explication(fig, plan.zones, total_area, lang=lang)
