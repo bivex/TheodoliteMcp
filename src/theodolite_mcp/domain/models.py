@@ -5,6 +5,21 @@ class Point(BaseModel):
     name: str
     x: Optional[float] = None
     y: Optional[float] = None
+    z: Optional[float] = None
+
+class StadiaMeasurement(BaseModel):
+    top_hair: float
+    bottom_hair: float
+    vertical_angle: float  # Elevation angle in decimal degrees
+    instrument_height: float = 0.0
+    target_height: float = 0.0
+    constant_k: float = 100.0
+    constant_c: float = 0.0
+
+class StadiaResult(BaseModel):
+    horizontal_distance: float
+    vertical_distance: float
+    elevation_diff: float
 
 class Observation(BaseModel):
     point_name: str

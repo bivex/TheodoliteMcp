@@ -1,6 +1,6 @@
 import math
 from typing import List
-from .models import TraverseData, TraverseResult, Point, Observation
+from .models import TraverseData, TraverseResult, Point, Observation, StadiaMeasurement, StadiaResult
 
 def normalize_angle(angle: float) -> float:
     return angle % 360
@@ -52,6 +52,70 @@ def evaluate_precision(relative_error: float) -> str:
         return f"Satisfactory (1:{int(inv_error)})"
     else:
         return f"Unacceptable (1:{int(inv_error)}) - Re-measurement recommended"
+
+def calculate_stadia(m: StadiaMeasurement) -> StadiaResult:
+    """Performs tacheometric (stadia) reduction."""
+    s = abs(m.top_hair - m.bottom_hair)
+    v_rad = math.radians(m.vertical_angle)
+    
+    # Horizontal Distance = (K*S + C) * cos^2(V)
+    ks_c = m.constant_k * s + m.constant_c
+    hd = ks_c * (math.cos(v_rad) ** 2)
+    
+    # Vertical Distance = 0.5 * (K*S + C) * sin(2V)
+    vd = 0.5 * ks_c * math.sin(2 * v_rad)
+    
+    # Elevation Difference = VD + HI - HT
+    elevation_diff = vd + m.instrument_height - m.target_height
+    
+    return StadiaResult(
+        horizontal_distance=round(hd, 3),
+        vertical_distance=round(vd, 3),
+        elevation_diff=round(elevation_diff, 3)
+    )
+
+def calculate_inverse(p1: Point, p2: Point) -> dict:
+    """Calculates azimuth and horizontal distance between two points."""
+    dx = p2.x - p1.x
+    dy = p2.y - p1.y
+    dist = math.sqrt(dx**2 + dy**2)
+    az = calculate_azimuth_from_points(p1, p2)
+    
+    res = {"azimuth": round(az, 4), "distance": round(dist, 3)}
+    if p1.z is not None and p2.z is not None:
+        res["dz"] = round(p2.z - p1.z, 3)
+        res["slope_distance"] = round(math.sqrt(dist**2 + (p2.z - p1.z)**2), 3)
+        res["grade_percent"] = round((p2.z - p1.z) / dist * 100, 2) if dist > 0 else 0
+    return res
+
+def generate_markdown_report(result: TraverseResult) -> str:
+    """Generates a professional survey report in Markdown."""
+    lines = [
+        "# Theodolite Survey Processing Report",
+        f"**Status:** {result.precision_status}",
+        "",
+        "## Summary",
+        f"- **Total Length:** {result.total_length:.3f} m",
+        f"- **Angular Misclosure:** {result.angular_misclosure:.4f}°",
+        f"- **Linear Misclosure:** {result.linear_misclosure:.4f} m",
+        f"- **Relative Precision:** 1:{int(1/result.relative_precision) if result.relative_precision > 0 else 0}",
+    ]
+    
+    if result.area:
+        lines.append(f"- **Calculated Area:** {result.area:.2f} m²")
+        
+    lines.extend([
+        "",
+        "## Adjusted Coordinates",
+        "| Point | X (North) | Y (East) | Z (Elev) |",
+        "| :--- | :--- | :--- | :--- |"
+    ])
+    
+    for pt in result.points:
+        z_str = f"{pt.z:.3f}" if pt.z is not None else "-"
+        lines.append(f"| {pt.name} | {pt.x:.3f} | {pt.y:.3f} | {z_str} |")
+        
+    return "\n".join(lines)
 
 def calculate_traverse(data: TraverseData) -> TraverseResult:
     n = len(data.observations)
