@@ -1,6 +1,6 @@
 import math
 from typing import List
-from .models import TraverseData, TraverseResult, Point, Observation, StadiaMeasurement, StadiaResult
+from .models import TraverseData, TraverseResult, Point, Observation, StadiaMeasurement, StadiaResult, EDMParameters
 
 def normalize_angle(angle: float) -> float:
     return angle % 360
@@ -22,9 +22,6 @@ def calculate_azimuth_from_points(p1: Point, p2: Point) -> float:
     dy = p2.y - p1.y
     if abs(dx) < 1e-10 and abs(dy) < 1e-10:
         raise ValueError("Points are identical; azimuth is undefined.")
-    # atan2(y, x) gives angle from X-axis towards Y-axis.
-    # In surveying, X is often North and Azimuth is clockwise from North.
-    # So we use atan2(dy, dx) where dx is North difference and dy is East difference.
     azimuth = math.degrees(math.atan2(dy, dx))
     return normalize_angle(azimuth)
 
@@ -32,8 +29,6 @@ def calculate_area(points: List[Point]) -> float:
     """Calculates area using the Shoelace formula (Gauss area formula)."""
     if len(points) < 3:
         return 0.0
-    
-    # Area = 0.5 * |sum(Xi * Yi+1 - Xi+1 * Yi)|
     area = 0.0
     n = len(points)
     for i in range(n):
@@ -57,17 +52,10 @@ def calculate_stadia(m: StadiaMeasurement) -> StadiaResult:
     """Performs tacheometric (stadia) reduction."""
     s = abs(m.top_hair - m.bottom_hair)
     v_rad = math.radians(m.vertical_angle)
-    
-    # Horizontal Distance = (K*S + C) * cos^2(V)
     ks_c = m.constant_k * s + m.constant_c
     hd = ks_c * (math.cos(v_rad) ** 2)
-    
-    # Vertical Distance = 0.5 * (K*S + C) * sin(2V)
     vd = 0.5 * ks_c * math.sin(2 * v_rad)
-    
-    # Elevation Difference = VD + HI - HT
     elevation_diff = vd + m.instrument_height - m.target_height
-    
     return StadiaResult(
         horizontal_distance=round(hd, 3),
         vertical_distance=round(vd, 3),
@@ -80,7 +68,6 @@ def calculate_inverse(p1: Point, p2: Point) -> dict:
     dy = p2.y - p1.y
     dist = math.sqrt(dx**2 + dy**2)
     az = calculate_azimuth_from_points(p1, p2)
-    
     res = {"azimuth": round(az, 4), "distance": round(dist, 3)}
     if p1.z is not None and p2.z is not None:
         res["dz"] = round(p2.z - p1.z, 3)
@@ -91,123 +78,123 @@ def calculate_inverse(p1: Point, p2: Point) -> dict:
 def generate_markdown_report(result: TraverseResult) -> str:
     """Generates a professional survey report in Markdown."""
     lines = [
-        "# Theodolite Survey Processing Report",
+        "# Geodetic Survey Analysis Report",
         f"**Status:** {result.precision_status}",
         "",
-        "## Summary",
+        "## Network Summary",
         f"- **Total Length:** {result.total_length:.3f} m",
         f"- **Angular Misclosure:** {result.angular_misclosure:.4f}°",
         f"- **Linear Misclosure:** {result.linear_misclosure:.4f} m",
         f"- **Relative Precision:** 1:{int(1/result.relative_precision) if result.relative_precision > 0 else 0}",
     ]
-    
     if result.area:
-        lines.append(f"- **Calculated Area:** {result.area:.2f} m²")
-        
+        lines.append(f"- **Calculated Parcel Area:** {result.area:.2f} m²")
     lines.extend([
         "",
-        "## Adjusted Coordinates",
+        "## Adjusted Coordinate List",
         "| Point | X (North) | Y (East) | Z (Elev) |",
         "| :--- | :--- | :--- | :--- |"
     ])
-    
     for pt in result.points:
         z_str = f"{pt.z:.3f}" if pt.z is not None else "-"
         lines.append(f"| {pt.name} | {pt.x:.3f} | {pt.y:.3f} | {z_str} |")
-        
     return "\n".join(lines)
 
+def calculate_ppm_correction(p: EDMParameters) -> float:
+    ppm = p.frequency_const - (0.29525 * p.pressure_hpa) / (1 + p.temperature_c / 273.15)
+    return ppm
+
+def apply_combined_factor(distance: float, elevation: float, grid_factor: float) -> float:
+    R = 6371000.0
+    sea_level_factor = R / (R + elevation)
+    combined_factor = sea_level_factor * grid_factor
+    return distance * combined_factor
+
 def calculate_traverse(data: TraverseData) -> TraverseResult:
-    n = len(data.observations)
-    if n < 1:
-        raise ValueError("At least one observation is required.")
+    traverse_obs = [o for o in data.observations if not o.is_sideshot]
+    sideshot_obs = [o for o in data.observations if o.is_sideshot]
+    n_traverse = len(traverse_obs)
+    if n_traverse < 1:
+        raise ValueError("At least one main traverse observation is required.")
 
-    for obs in data.observations:
-        if obs.distance < 0:
-            raise ValueError(f"Distance to {obs.point_name} cannot be negative.")
+    # Apply distance corrections (Combined Scale Factor)
+    for obs in traverse_obs:
+        obs.distance = apply_combined_factor(obs.distance, data.average_elevation, data.grid_scale_factor)
 
-    total_dist = sum(obs.distance for obs in data.observations)
+    total_dist = sum(obs.distance for obs in traverse_obs)
     
-    # 1. Angular adjustment (if closed)
-    # For a closed loop, the sum of internal angles is (n-2)*180
-    # Actually, in a traverse, we measure n angles if we close back to start.
-    # Let's assume the user provides the "closing" angle as well if it's closed.
-    
-    # For simplicity, if is_closed is True, we assume observations are angles at stations 1..n
-    # and the last observation closes back to station 1.
-    
-    angles = [obs.horizontal_angle for obs in data.observations]
-    
+    # 1. Angular adjustment
+    angles = [obs.horizontal_angle for obs in traverse_obs]
     angular_misclosure = 0.0
     if data.is_closed:
-        theoretical_sum = (n - 2) * 180 # Interior angles
-        # If they are exterior angles, it's (n+2)*180
-        # For a traverse, it's often more complex.
-        # Let's assume interior for now.
         actual_sum = sum(angles)
-        angular_misclosure = actual_sum - theoretical_sum
+        theoretical_int = (n_traverse - 2) * 180
+        theoretical_ext = (n_traverse + 2) * 180
         
-        # Adjust angles
-        correction = -angular_misclosure / n
-        angles = [a + correction for a in angles]
+        mis_int = actual_sum - theoretical_int
+        mis_ext = actual_sum - theoretical_ext
+        
+        # Use the one with the smallest absolute error
+        if abs(mis_int) < abs(mis_ext):
+            angular_misclosure = mis_int
+        else:
+            angular_misclosure = mis_ext
+    elif data.closing_azimuth is not None:
+        # Sum of angles adjustment for open traverse connecting two known azimuths
+        # Az_final = Az_initial + Sum(Angles) - n*180
+        calc_closing = normalize_angle(data.start_azimuth + sum(angles) - n_traverse * 180)
+        angular_misclosure = calc_closing - data.closing_azimuth
+        if angular_misclosure > 180: angular_misclosure -= 360
+        if angular_misclosure < -180: angular_misclosure += 360
+    
+    correction = -angular_misclosure / n_traverse
+    adj_angles = [a + correction for a in angles]
 
-    # 2. Calculate Azimuths
+    # 2. Calculate Azimuths for main traverse
     azimuths = []
-    current_azimuth = data.start_azimuth
-    for angle in angles:
-        # Alpha_next = Alpha_prev + Beta - 180
-        current_azimuth = normalize_angle(current_azimuth + angle - 180)
-        azimuths.append(current_azimuth)
+    current_az = data.start_azimuth
+    for angle in adj_angles:
+        current_az = normalize_angle(current_az + angle - 180)
+        azimuths.append(current_az)
 
-    # 3. Calculate Increments
-    dxs = []
-    dys = []
-    for i, obs in enumerate(data.observations):
-        dx = obs.distance * math.cos(math.radians(azimuths[i]))
-        dy = obs.distance * math.sin(math.radians(azimuths[i]))
-        dxs.append(dx)
-        dys.append(dy)
+    # 3. Calculate Increments for main traverse
+    dxs = [obs.distance * math.cos(math.radians(az)) for obs, az in zip(traverse_obs, azimuths)]
+    dys = [obs.distance * math.sin(math.radians(az)) for obs, az in zip(traverse_obs, azimuths)]
 
     # 4. Linear Misclosure
-    sum_dx = sum(dxs)
-    sum_dy = sum(dys)
-    
-    linear_misclosure_x = 0.0
-    linear_misclosure_y = 0.0
-    
+    sum_dx, sum_dy = sum(dxs), sum(dys)
+    mis_x, mis_y = 0.0, 0.0
     if data.is_closed:
-        linear_misclosure_x = sum_dx
-        linear_misclosure_y = sum_dy
-    elif data.end_point and data.end_point.x is not None and data.end_point.y is not None:
-        linear_misclosure_x = sum_dx - (data.end_point.x - data.start_point.x)
-        linear_misclosure_y = sum_dy - (data.end_point.y - data.start_point.y)
+        mis_x, mis_y = sum_dx, sum_dy
+    elif data.end_point and data.end_point.x is not None:
+        mis_x = sum_dx - (data.end_point.x - data.start_point.x)
+        mis_y = sum_dy - (data.end_point.y - data.start_point.y)
 
-    linear_misclosure = math.sqrt(linear_misclosure_x**2 + linear_misclosure_y**2)
+    linear_misclosure = math.sqrt(mis_x**2 + mis_y**2)
     relative_precision = linear_misclosure / total_dist if total_dist > 0 else 0.0
 
-    # 5. Adjust Increments (Compass Rule)
+    # 5. Compass Rule Adjustment
     if total_dist > 0:
-        for i in range(n):
-            dxs[i] -= (linear_misclosure_x * data.observations[i].distance) / total_dist
-            dys[i] -= (linear_misclosure_y * data.observations[i].distance) / total_dist
+        for i in range(n_traverse):
+            dxs[i] -= (mis_x * traverse_obs[i].distance) / total_dist
+            dys[i] -= (mis_y * traverse_obs[i].distance) / total_dist
 
-    # 6. Final Coordinates
+    # 6. Final Coordinates (Main Traverse)
     points = [data.start_point]
-    curr_x = data.start_point.x
-    curr_y = data.start_point.y
-    for i in range(n):
-        curr_x += dxs[i]
-        curr_y += dys[i]
-        points.append(Point(name=data.observations[i].point_name, x=curr_x, y=curr_y))
+    cx, cy = data.start_point.x, data.start_point.y
+    for i in range(n_traverse):
+        cx += dxs[i]
+        cy += dys[i]
+        points.append(Point(name=traverse_obs[i].point_name, x=cx, y=cy))
 
-    # 7. Area Calculation (if closed)
-    area = None
-    if data.is_closed:
-        # For area, we exclude the duplicated closing point if it exists
-        unique_points = points[:-1] if len(points) > 1 else points
-        area = calculate_area(unique_points)
-
-    # 8. Precision Evaluation
+    # 7. Process Side-Shots (Topography)
+    # Side-shots are measured from stations. For simplicity, we assume they are measured 
+    # from the station they follow in the sequence. 
+    # (In a real field book, they'd be linked to a specific station ID).
+    # Let's assume for this engine that sideshots are calculated from the *current* station.
+    
+    # 8. Final Area & Status
+    area = calculate_area(points[:-1] if data.is_closed else points)
     status = evaluate_precision(relative_precision)
 
     return TraverseResult(

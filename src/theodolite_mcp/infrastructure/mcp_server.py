@@ -72,22 +72,34 @@ def compute_parcel_area(points_json: list[dict]) -> float:
     return calculate_area(points)
 
 @mcp.tool()
+def compute_edm_atmospheric_correction(temp_c: float, pressure_hpa: float, 
+                                        freq_const: float = 281.8) -> float:
+    """
+    Calculates the atmospheric PPM (Parts Per Million) correction for EDM measurements.
+    """
+    params = EDMParameters(temperature_c=temp_c, pressure_hpa=pressure_hpa, frequency_const=freq_const)
+    return calculate_ppm_correction(params)
+
+@mcp.tool()
 def adjust_traverse_network(
     start_x: float,
     start_y: float,
     start_z: float = None,
     start_name: str = "P1",
     start_azimuth: float = 0.0,
+    closing_azimuth: float = None,
     observations_json: list[dict] = [],
     is_closed: bool = False,
+    avg_elevation: float = 0.0,
+    grid_scale_factor: float = 1.0,
     end_x: float = None,
     end_y: float = None,
     end_name: str = None,
     generate_report: bool = True
 ):
     """
-    Performs Bowditch (Compass Rule) adjustment on a traverse network.
-    Returns adjusted coordinates, misclosure analysis, and a professional report.
+    Performs Bowditch (Compass Rule) adjustment on a traverse network with geodetic corrections.
+    Includes support for closed loops and open traverses between known azimuths.
     """
     observations = [Observation(**obs) for obs in observations_json]
     start_point = Point(name=start_name, x=start_x, y=start_y, z=start_z)
@@ -100,8 +112,11 @@ def adjust_traverse_network(
         start_point=start_point,
         end_point=end_point,
         start_azimuth=start_azimuth,
+        closing_azimuth=closing_azimuth,
         observations=observations,
-        is_closed=is_closed
+        is_closed=is_closed,
+        average_elevation=avg_elevation,
+        grid_scale_factor=grid_scale_factor
     )
     
     result = service.process_theodolite_traverse(data)
