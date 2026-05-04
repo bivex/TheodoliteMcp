@@ -5,16 +5,16 @@ from typing import List, Optional, Tuple
 import matplotlib
 matplotlib.use("Agg")
 from matplotlib.figure import Figure
-from matplotlib.patches import FancyArrowPatch
+from matplotlib.patches import Rectangle
+import matplotlib.patches as patches
 
 from .models import PlotPlan, Point, Zone
 from .logic import calculate_azimuth_from_points, calculate_area
 
 
 ZONE_COLORS = [
-    "#4CAF50", "#2196F3", "#FF9800", "#9C27B0",
-    "#F44336", "#00BCD4", "#795548", "#607D8B",
-    "#8BC34A", "#E91E63",
+    "#F5F5DC", "#E8F5E9", "#FFF3E0", "#E3F2FD",
+    "#FCE4EC", "#F3E5F5", "#EFEBE9", "#FAFAFA",
 ]
 
 
@@ -32,6 +32,7 @@ def _polygon_coords(points: List[Point]) -> Tuple[List[float], List[float]]:
 
 def _centroid(points: List[Point]) -> Tuple[float, float]:
     n = len(points)
+    if n == 0: return 0, 0
     return sum(p.x for p in points) / n, sum(p.y for p in points) / n
 
 
@@ -50,17 +51,7 @@ def _perpendicular_offset(p1: Point, p2: Point, distance: float = 1.0) -> Tuple[
     return nx, ny
 
 
-def _nice_scale_length(total_span: float) -> float:
-    candidates = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000]
-    target = total_span / 5
-    best = candidates[0]
-    for c in candidates:
-        if c <= target:
-            best = c
-    return best
-
-
-def _draw_boundary(ax, points: List[Point], color: str = "#333333", linewidth: float = 2.0):
+def _draw_boundary(ax, points: List[Point], color: str = "black", linewidth: float = 2.0):
     xs, ys = _polygon_coords(points)
     ax.plot(xs, ys, color=color, linewidth=linewidth, zorder=3)
 
@@ -70,128 +61,115 @@ def _draw_zones(ax, zones: List[Zone]):
         color = zone.fill_color or _auto_color(i)
         xs, ys = _polygon_coords(zone.points)
         ax.fill(xs, ys, color=color, alpha=zone.fill_alpha, zorder=1)
-        ax.plot(xs, ys, color=color, linewidth=1.0, linestyle="--", alpha=0.7, zorder=2)
+        ax.plot(xs, ys, color="black", linewidth=0.5, linestyle="-", alpha=0.5, zorder=2)
+        
+        # Add index number to zone for explication
+        zx, zy = _centroid(zone.points)
+        ax.text(zx, zy, str(i + 1), fontsize=10, fontweight="bold", 
+                ha="center", va="center", zorder=5,
+                bbox=dict(boxstyle="circle,pad=0.2", facecolor="white", edgecolor="black", alpha=0.7))
 
 
-def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 9):
+def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8):
     cx, cy = _centroid(points)
     for p in points:
         dx, dy = p.x - cx, p.y - cy
         dist = math.hypot(dx, dy)
         if dist > 0:
-            offset_x = dx / dist * 2.5
-            offset_y = dy / dist * 2.5
+            offset_x = dx / dist * 1.5
+            offset_y = dy / dist * 1.5
         else:
-            offset_x, offset_y = 2.5, 2.5
-        ax.annotate(
-            p.name, xy=(p.x, p.y), xytext=(p.x + offset_x, p.y + offset_y),
-            fontsize=fontsize, fontweight="bold", ha="center", va="center",
-            zorder=5,
-            bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="gray", alpha=0.8),
-        )
+            offset_x, offset_y = 1.5, 1.5
+        ax.text(p.x + offset_x, p.y + offset_y, p.name,
+                fontsize=fontsize, ha="center", va="center", zorder=5)
 
 
-def _draw_distances(ax, points: List[Point], fontsize: float = 8):
+def _draw_distances(ax, points: List[Point], fontsize: float = 7):
     for i in range(len(points)):
         p1 = points[i]
         p2 = points[(i + 1) % len(points)]
         dist = math.hypot(p2.x - p1.x, p2.y - p1.y)
-        if dist == 0:
-            continue
+        if dist < 0.1: continue
         mx, my = _edge_midpoint(p1, p2)
-        ox, oy = _perpendicular_offset(p1, p2, distance=2.0)
-        ax.annotate(
-            f"{dist:.1f} м", xy=(mx, my), xytext=(mx + ox, my + oy),
-            fontsize=fontsize, color="#1565C0", ha="center", va="center",
-            zorder=5,
-            bbox=dict(boxstyle="round,pad=0.15", facecolor="white", edgecolor="none", alpha=0.7),
-        )
+        ox, oy = _perpendicular_offset(p1, p2, distance=1.2)
+        
+        # Calculate rotation for GOST-like alignment
+        angle = math.degrees(math.atan2(p2.y - p1.y, p2.x - p1.x))
+        if angle > 90: angle -= 180
+        if angle < -90: angle += 180
+            
+        ax.text(mx + ox, my + oy, f"{dist:.2f}", 
+                fontsize=fontsize, ha="center", va="center", rotation=angle, zorder=5)
 
 
-def _draw_azimuths(ax, points: List[Point], fontsize: float = 7.5):
-    for i in range(len(points)):
-        p1 = points[i]
-        p2 = points[(i + 1) % len(points)]
-        dist = math.hypot(p2.x - p1.x, p2.y - p1.y)
-        if dist == 0:
-            continue
-        az = calculate_azimuth_from_points(p1, p2)
-        ox, oy = _perpendicular_offset(p1, p2, distance=-2.5)
-        frac = 0.3
-        lx = p1.x + (p2.x - p1.x) * frac + ox
-        ly = p1.y + (p2.y - p1.y) * frac + oy
-        d, m, s = _decimal_to_dms(az)
-        az_str = f"{d}°{m:02d}'{s:04.1f}\""
-        ax.annotate(
-            az_str, xy=(lx, ly), fontsize=fontsize, color="#C62828",
-            ha="center", va="center", zorder=5,
-            bbox=dict(boxstyle="round,pad=0.15", facecolor="white", edgecolor="none", alpha=0.7),
-        )
+def _draw_stamp(fig, title: str):
+    # GOST 21.1101 standard stamp mockup (185x55mm usually, but scaled for plot)
+    ax_stamp = fig.add_axes([0.7, 0.05, 0.25, 0.15]) # Right bottom
+    ax_stamp.set_xticks([])
+    ax_stamp.set_yticks([])
+    ax_stamp.set_facecolor("white")
+    for spine in ax_stamp.spines.values():
+        spine.set_linewidth(1.5)
+    
+    # Grid for stamp
+    ax_stamp.axhline(0.33, color="black", lw=1)
+    ax_stamp.axhline(0.66, color="black", lw=1)
+    ax_stamp.axvline(0.4, color="black", lw=1)
+    
+    ax_stamp.text(0.05, 0.8, "Project:", fontsize=7, va="center")
+    ax_stamp.text(0.45, 0.8, title, fontsize=9, fontweight="bold", va="center")
+    
+    ax_stamp.text(0.05, 0.5, "Stage:", fontsize=7, va="center")
+    ax_stamp.text(0.45, 0.5, "Draft (П)", fontsize=8, va="center")
+    
+    ax_stamp.text(0.05, 0.15, "Scale:", fontsize=7, va="center")
+    ax_stamp.text(0.45, 0.15, "1:Auto", fontsize=8, va="center")
 
 
-def _decimal_to_dms(decimal: float) -> Tuple[int, int, float]:
-    decimal = decimal % 360
-    d = int(decimal)
-    mf = (decimal - d) * 60
-    m = int(mf)
-    s = (mf - m) * 60
-    return d, m, s
-
-
-def _draw_areas(ax, boundary_points: List[Point], zones: List[Zone], fontsize: float = 9):
-    area = calculate_area(boundary_points)
-    if area and area > 0:
-        cx, cy = _centroid(boundary_points)
-        sotki = area / 100.0
-        ax.annotate(
-            f"{area:.1f} м² ({sotki:.2f} сот.)",
-            xy=(cx, cy), fontsize=fontsize + 1, fontweight="bold",
-            ha="center", va="center", color="#1B5E20", zorder=5,
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="#E8F5E9", edgecolor="#4CAF50", alpha=0.9),
-        )
+def _draw_explication(fig, zones: List[Zone], total_area: float):
+    # Legend / Explication of zones
+    ax_leg = fig.add_axes([0.05, 0.05, 0.25, 0.25]) # Left bottom
+    ax_leg.set_axis_off()
+    
+    y_pos = 0.95
+    ax_leg.text(0, y_pos, "ЭКСПЛИКАЦИЯ ЗОН", fontsize=10, fontweight="bold")
+    y_pos -= 0.1
+    
+    ax_leg.text(0, y_pos, f"Общая площадь: {total_area:.1f} м² ({total_area/100:.2f} сот.)", 
+                fontsize=8, fontweight="bold")
+    y_pos -= 0.1
+    
+    header_y = y_pos
+    ax_leg.text(0, header_y, "№", fontsize=8, fontweight="bold")
+    ax_leg.text(0.15, header_y, "Наименование", fontsize=8, fontweight="bold")
+    ax_leg.text(0.75, header_y, "S, м²", fontsize=8, fontweight="bold")
+    y_pos -= 0.08
+    
     for i, zone in enumerate(zones):
-        zone_area = calculate_area(zone.points)
-        if zone_area and zone_area > 0:
-            zx, zy = _centroid(zone.points)
-            zs = zone_area / 100.0
-            ax.annotate(
-                f"{zone.name}\n{zone_area:.1f} м² ({zs:.2f} сот.)",
-                xy=(zx, zy), fontsize=fontsize - 1, ha="center", va="center",
-                color="#333333", zorder=5,
-                bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="gray", alpha=0.85),
-            )
+        if y_pos < 0.05: break
+        area = calculate_area(zone.points) or 0
+        ax_leg.text(0, y_pos, str(i + 1), fontsize=8)
+        ax_leg.text(0.15, y_pos, zone.name[:20], fontsize=8)
+        ax_leg.text(0.75, y_pos, f"{area:.1f}", fontsize=8)
+        y_pos -= 0.07
 
 
-def _draw_north_arrow(ax, xlim, ylim):
-    x = xlim[1] - (xlim[1] - xlim[0]) * 0.06
-    y_start = ylim[1] - (ylim[1] - ylim[0]) * 0.12
-    y_end = ylim[1] - (ylim[1] - ylim[0]) * 0.03
-    ax.annotate(
-        "N", xy=(x, y_end), xytext=(x, y_start),
-        fontsize=11, fontweight="bold", ha="center", va="bottom",
-        arrowprops=dict(arrowstyle="->", color="black", lw=1.5),
-        zorder=6,
-    )
-
-
-def _draw_scale_bar(ax, xlim, ylim, total_span: float):
-    scale_len = _nice_scale_length(total_span)
-    x_start = xlim[0] + (xlim[1] - xlim[0]) * 0.03
-    y = ylim[0] + (ylim[1] - ylim[0]) * 0.04
-    x_end = x_start + scale_len
-
-    ax.plot([x_start, x_end], [y, y], color="black", linewidth=2, zorder=6)
-    ax.plot([x_start, x_start], [y - total_span * 0.008, y + total_span * 0.008], color="black", linewidth=2, zorder=6)
-    ax.plot([x_end, x_end], [y - total_span * 0.008, y + total_span * 0.008], color="black", linewidth=2, zorder=6)
-    ax.text(
-        (x_start + x_end) / 2, y + total_span * 0.015,
-        f"{scale_len:.0f} м", ha="center", va="bottom", fontsize=8, zorder=6,
-    )
+def _draw_north_arrow(ax):
+    # More professional north arrow
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    x = xlim[0] + (xlim[1] - xlim[0]) * 0.05
+    y = ylim[1] - (ylim[1] - ylim[0]) * 0.05
+    
+    ax.annotate("", xy=(x, y + (ylim[1]-ylim[0])*0.05), xytext=(x, y),
+                arrowprops=dict(arrowstyle="fancy", color="black", connectionstyle="arc3"))
+    ax.text(x, y + (ylim[1]-ylim[0])*0.07, "С", fontsize=12, fontweight="bold", ha="center")
 
 
 def render_plot_plan(plan: PlotPlan) -> bytes:
     fig = Figure(figsize=(plan.width_inches, plan.height_inches), dpi=plan.dpi)
-    ax = fig.add_subplot(111)
+    # Increase bottom margin for stamp and explication
+    ax = fig.add_axes([0.1, 0.35, 0.8, 0.55]) 
 
     all_points = list(plan.boundary_points)
     for zone in plan.zones:
@@ -208,40 +186,35 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
 
     x_span = x_max - x_min or 1
     y_span = y_max - y_min or 1
-    margin_x = x_span * 0.15
-    margin_y = y_span * 0.15
-    ax.set_xlim(x_min - margin_x, x_max + margin_x)
-    ax.set_ylim(y_min - margin_y, y_max + margin_y)
-
+    
+    # Grid snap for "surveyor" look
+    ax.set_xlim(x_min - x_span*0.2, x_max + x_span*0.2)
+    ax.set_ylim(y_min - y_span*0.2, y_max + y_span*0.2)
     ax.set_aspect("equal")
-    ax.set_title(plan.title, fontsize=14, fontweight="bold", pad=15)
-    ax.set_xlabel("X (м)", fontsize=9)
-    ax.set_ylabel("Y (м)", fontsize=9)
-    ax.grid(True, alpha=0.3, linestyle="--")
 
-    xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
+    # GOST grid
+    ax.grid(True, which="both", color="#CCCCCC", linestyle=":", linewidth=0.5, zorder=0)
+    ax.set_xlabel("X (m)", fontsize=8)
+    ax.set_ylabel("Y (m)", fontsize=8)
 
     if plan.zones:
         _draw_zones(ax, plan.zones)
 
     _draw_boundary(ax, plan.boundary_points)
 
-    if plan.show_areas:
-        _draw_areas(ax, plan.boundary_points, plan.zones)
     if plan.show_vertex_labels:
         _draw_vertex_labels(ax, plan.boundary_points)
     if plan.show_distances:
         _draw_distances(ax, plan.boundary_points)
-    if plan.show_azimuths:
-        _draw_azimuths(ax, plan.boundary_points)
-    if plan.show_north_arrow:
-        _draw_north_arrow(ax, xlim, ylim)
-    if plan.show_scale_bar:
-        total_span = max(x_span, y_span)
-        _draw_scale_bar(ax, xlim, ylim, total_span)
+    
+    _draw_north_arrow(ax)
+    
+    total_area = calculate_area(plan.boundary_points) or 0
+    _draw_explication(fig, plan.zones, total_area)
+    _draw_stamp(fig, plan.title)
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=plan.dpi, bbox_inches="tight")
+    fig.savefig(buf, format="png", dpi=plan.dpi, facecolor="white")
     buf.seek(0)
     return buf.getvalue()
+
