@@ -123,20 +123,26 @@ def _get_hatch(name: str) -> Optional[str]:
     return None
 
 def _draw_boundary(ax, points: List[Point], color: str = 'black'):
-    # ISO 128-23, 01.3: Continuous extra-wide line
+    # ISO 128-23, 04.3: Long dashed dotted extra-wide line (Boundary lines)
     xs, ys = _polygon_coords(points)
-    ax.plot(xs, ys, color=color, linewidth=D_EXTRA_WIDE, linestyle=TYPE_01, zorder=3)
+    ax.plot(xs, ys, color=color, linewidth=D_EXTRA_WIDE, linestyle=TYPE_04, zorder=3)
 
 def _draw_zones(ax, zones: List[Zone], show_areas: bool = False):
     for i, zone in enumerate(zones):
         color = zone.fill_color or _auto_color(i)
         hatch = _get_hatch(zone.name)
         xs, ys = _polygon_coords(zone.points)
+        area = calculate_area(zone.points) or 0
         
-        # Color fill (ISO 4069)
+        # 1. Color fill (ISO 128-50 toning)
         ax.fill(xs, ys, color=color, alpha=0.12, zorder=1)
+        
+        # 2. Hatching (ISO 128-50)
         if hatch:
-            ax.fill(xs, ys, fill=False, hatch=hatch, edgecolor='black', linewidth=0, alpha=0.1, zorder=2)
+            # Matplotlib '/' is 45 deg by default. 
+            # For large areas (>300m2), we use a lighter density
+            h_density = hatch if area < 300 else hatch[0] # e.g., '///' -> '/'
+            ax.fill(xs, ys, fill=False, hatch=h_density, edgecolor='black', linewidth=0, alpha=0.15, zorder=2)
         
         is_building = any(k in zone.name.lower() for k in ['дом', 'здание', 'building', 'house'])
         
@@ -145,21 +151,63 @@ def _draw_zones(ax, zones: List[Zone], show_areas: bool = False):
             lw = D_WIDE
             ls = TYPE_01
         else:
-            # ISO 128-23, 04.3: Long dashed dotted extra-wide line (boundary line for zones)
+            # ISO 128-23, 04.3: Long dashed dotted extra-wide line (Boundary)
             lw = D_EXTRA_WIDE
             ls = TYPE_04
             
         ax.plot(xs, ys, color='black', linewidth=lw, linestyle=ls, zorder=3)
         
-        # ISO Symbol Line Width (0.5mm) for circular labels
+        # 3. Inscriptions & Labels (ISO 128-50: Interruption of hatching)
         zx, zy = _centroid(zone.points)
+        # Opaque white bbox (alpha=1.0) creates the 'window' in the hatching
         ax.text(zx, zy, str(i + 1), fontsize=8.5, fontweight='bold', ha='center', va='center', zorder=10,
-                bbox=dict(boxstyle='circle,pad=0.2', facecolor='white', edgecolor='black', linewidth=D_SYMBOL/MM_TO_PT, alpha=0.85))
+                bbox=dict(boxstyle='circle,pad=0.2', facecolor='white', edgecolor='black', 
+                          linewidth=D_SYMBOL/MM_TO_PT, alpha=1.0))
         
         if show_areas:
-            area = calculate_area(zone.points) or 0
+            # Inscription below the zone number
             ax.text(zx, zy - 1.2, f"{area:.1f} m²", fontsize=7, ha='center', va='top', zorder=10, 
-                    bbox=dict(boxstyle='round,pad=0.1', facecolor='white', edgecolor='none', alpha=0.6))
+                    bbox=dict(boxstyle='round,pad=0.1', facecolor='white', edgecolor='none', alpha=1.0))
+
+def _draw_leader(ax, target_x: float, target_y: float, text: str, 
+                 offset_x: float = 5.0, offset_y: float = 5.0, 
+                 terminator: str = "dot", m_per_pt: float = 0.1, fontsize: float = 7):
+    """
+    ISO 128-22: Leader and reference lines.
+    terminator: 'dot' (area), 'arrow' (edge/line), or 'none'.
+    """
+    d_m = D * m_per_pt
+    # Shelf length adapted to text (approx 1.8mm per char + margins)
+    shelf_len = (len(text) * 1.8 + 2.0) * MM_TO_PT * m_per_pt
+    
+    # Leader end (start of shelf)
+    lx, ly = target_x + offset_x, target_y + offset_y
+    
+    # 1. Leader line (Narrow 01.1)
+    ax.plot([target_x, lx], [target_y, ly], color='black', linewidth=D, linestyle=TYPE_01, zorder=6)
+    
+    # 2. Terminator
+    if terminator == "dot":
+        # ISO 128-22: dot dia = 5 * line width
+        dot_radius = 2.5 * D * m_per_pt
+        circle = patches.Circle((target_x, target_y), dot_radius, color='black', zorder=7)
+        ax.add_patch(circle)
+    elif terminator == "arrow":
+        # ISO 128-22: 15 deg arrowhead
+        angle = math.atan2(ly - target_y, lx - target_x)
+        # Small vector for annotation head orientation
+        ax.annotate("", xy=(target_x, target_y), 
+                    xytext=(target_x + math.cos(angle)*0.01, target_y + math.sin(angle)*0.01),
+                    arrowprops=dict(arrowstyle='-|>', color='black', mutation_scale=10, 
+                                    linewidth=D/MM_TO_PT, shrinkA=0, shrinkB=0), zorder=7)
+
+    # 3. Reference line (Shelf) - strictly horizontal
+    shelf_dir = 1 if offset_x >= 0 else -1
+    ax.plot([lx, lx + shelf_dir * shelf_len], [ly, ly], color='black', linewidth=D, linestyle=TYPE_01, zorder=6)
+    
+    # 4. Text - preferably above shelf, gap = 2 * line width
+    ax.text(lx + shelf_dir * shelf_len/2, ly + 2*d_m, text, 
+            fontsize=fontsize, ha='center', va='bottom', zorder=10)
 
 def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8):
     cx, cy = _centroid(points)
@@ -169,23 +217,43 @@ def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8):
         offset_x, offset_y = (dx / dist * 1.6, dy / dist * 1.6) if dist > 0 else (1.6, 1.6)
         ax.text(p.x + offset_x, p.y + offset_y, p.name, fontsize=fontsize, ha='center', va='center', zorder=5)
 
-def _draw_distances(ax, points: List[Point], standard: str = "construction", fontsize: float = 7, show_azimuths: bool = False):
-    # ISO 128-23 / ISO 129-4: Continuous narrow line for dimension/extension lines
+def _draw_distances(ax, points: List[Point], standard: str = "construction", fontsize: float = 7, show_azimuths: bool = False, m_per_pt: float = 0.1):
+    # ISO 128-23 / ISO 129-1 / ISO 129-4
+    # Line width D is in points. 
+    # Extension lines shall extend approx 8 * line width beyond dimension line.
+    overshoot = 8 * (D / MM_TO_PT) * (MM_TO_PT * m_per_pt) # simplified: 8 * D * m_per_pt
+    overshoot = 8 * D * m_per_pt
+    gap = 2 * D * m_per_pt # Small gap from feature
+    text_offset = 1.2 * MM_TO_PT * m_per_pt # ~1.2mm above line
+    
+    # Distance from object to dimension line (standard suggests ~7-10mm, let's use 8mm)
+    dim_offset_m = 8.0 * MM_TO_PT * m_per_pt
+
     for i in range(len(points)):
         p1, p2 = points[i], points[(i + 1) % len(points)]
         dist = math.hypot(p2.x - p1.x, p2.y - p1.y)
         if dist < 0.1: continue
-        mx, my = _edge_midpoint(p1, p2)
-        ox_line, oy_line = _perpendicular_offset(p1, p2, distance=3.5)
         
-        # Dimension lines (Narrow 01.1)
+        mx, my = _edge_midpoint(p1, p2)
+        ox_unit, oy_unit = _perpendicular_offset(p1, p2, distance=1.0)
+        
+        # Dimension line positions
+        ox_line, oy_line = ox_unit * dim_offset_m, oy_unit * dim_offset_m
+        
+        # 1. Dimension line (Narrow 01.1)
         ax.plot([p1.x + ox_line, p2.x + ox_line], [p1.y + oy_line, p2.y + oy_line], 
                 color='black', linewidth=D, linestyle=TYPE_01, zorder=4)
         
-        # Extension lines (Narrow 01.1)
-        ax.plot([p1.x, p1.x + ox_line * 1.05], [p1.y, p1.y + oy_line * 1.05], 
+        # 2. Extension lines (Narrow 01.1)
+        # From (p1 + gap) to (p1 + ox_line + overshoot)
+        p1_start_x, p1_start_y = p1.x + ox_unit * gap, p1.y + oy_unit * gap
+        p1_end_x, p1_end_y = p1.x + ox_line + ox_unit * overshoot, p1.y + oy_line + oy_unit * overshoot
+        ax.plot([p1_start_x, p1_end_x], [p1_start_y, p1_end_y], 
                 color='black', linewidth=D, linestyle=TYPE_01, zorder=4)
-        ax.plot([p2.x, p2.x + ox_line * 1.05], [p2.y, p2.y + oy_line * 1.05], 
+        
+        p2_start_x, p2_start_y = p2.x + ox_unit * gap, p2.y + oy_unit * gap
+        p2_end_x, p2_end_y = p2.x + ox_line + ox_unit * overshoot, p2.y + oy_line + oy_unit * overshoot
+        ax.plot([p2_start_x, p2_end_x], [p2_start_y, p2_end_y], 
                 color='black', linewidth=D, linestyle=TYPE_01, zorder=4)
         
         if standard == "shipbuilding":
@@ -202,26 +270,31 @@ def _draw_distances(ax, points: List[Point], standard: str = "construction", fon
                         arrowprops=dict(arrowstyle='-|>', color='black', mutation_scale=10, 
                                         linewidth=D_WIDE/MM_TO_PT, shrinkA=0, shrinkB=0), zorder=5)
         else:
-            # ISO 129-1 (Construction): Architectural ticks (Wide line 01.2)
-            tick_len = 0.5
-            for p in [(p1.x + ox_line, p1.y + oy_line), (p2.x + ox_line, p2.y + oy_line)]:
+            # ISO 129-1: Architectural ticks (Wide line 01.2)
+            # Standard ticks are 45 deg, length approx 2-3mm
+            tick_len = 2.0 * MM_TO_PT * m_per_pt
+            for p_base in [(p1.x + ox_line, p1.y + oy_line), (p2.x + ox_line, p2.y + oy_line)]:
                 t_angle = math.atan2(p2.y - p1.y, p2.x - p1.x) + math.pi/4
                 tx, ty = math.cos(t_angle) * tick_len, math.sin(t_angle) * tick_len
-                ax.plot([p[0] - tx, p[0] + tx], [p[1] - ty, p[1] + ty], color='black', linewidth=D_WIDE, linestyle=TYPE_01, zorder=5)
+                ax.plot([p_base[0] - tx, p_base[0] + tx], [p_base[1] - ty, p_base[1] + ty], 
+                        color='black', linewidth=D_WIDE, linestyle=TYPE_01, zorder=5)
             
         # Distance text positioning
         angle_deg = math.degrees(math.atan2(p2.y - p1.y, p2.x - p1.x))
         if angle_deg > 90: angle_deg -= 180
         if angle_deg < -90: angle_deg += 180
         
+        # Text offset (above line)
+        tx_off, ty_off = ox_unit * text_offset, oy_unit * text_offset
+        
         # Distance (above line)
-        ax.text(mx + ox_line, my + oy_line + 0.3, f'{dist:.2f}', 
+        ax.text(mx + ox_line + tx_off, my + oy_line + ty_off, f'{dist:.2f}', 
                 fontsize=fontsize, ha='center', va='bottom', rotation=angle_deg, zorder=10, style='italic')
         
         # Azimuth (below line)
         if show_azimuths:
             az = calculate_azimuth_from_points(p1, p2)
-            ax.text(mx + ox_line, my + oy_line - 0.3, f'{az:.1f}°', 
+            ax.text(mx + ox_line - tx_off, my + oy_line - ty_off, f'{az:.1f}°', 
                     fontsize=fontsize-1.5, ha='center', va='top', rotation=angle_deg, zorder=10)
 
 def _draw_scale_bar(ax, x_span: float, width_inches: float, lang: str = "ru"):
@@ -334,12 +407,18 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     ax.tick_params(labelsize=7.5)
     ax.set_xlabel("X (m)", fontsize=7.5, style='italic'); ax.set_ylabel("Y (m)", fontsize=7.5, style='italic')
     
+    # Calculate scale factor: meters per point
+    # Width of axes in points = (width_inches * 0.8) * 72
+    ax_width_pt = plan.width_inches * 0.8 * 72
+    m_per_pt = (x_max - x_min + x_span*0.56) / ax_width_pt if ax_width_pt > 0 else 0.1
+    
     if plan.zones: _draw_zones(ax, plan.zones, show_areas=plan.show_areas)
     _draw_boundary(ax, plan.boundary_points)
     
     if plan.show_vertex_labels: _draw_vertex_labels(ax, plan.boundary_points)
     if plan.show_distances: 
-        _draw_distances(ax, plan.boundary_points, standard=plan.standard, fontsize=7.5, show_azimuths=plan.show_azimuths)
+        _draw_distances(ax, plan.boundary_points, standard=plan.standard, fontsize=7.5, 
+                        show_azimuths=plan.show_azimuths, m_per_pt=m_per_pt)
     
     if plan.show_scale_bar:
         _draw_scale_bar(ax, x_span, plan.width_inches, lang=lang)
