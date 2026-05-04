@@ -1,7 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 from ..domain.models import TraverseData, Point, Observation
 from ..application.services import SurveyService
-from ..domain.logic import dms_to_decimal, decimal_to_dms, normalize_angle
+from ..domain.logic import dms_to_decimal, decimal_to_dms, normalize_angle, calculate_azimuth_from_points
 import math
 
 mcp = FastMCP("Theodolite Survey Processor")
@@ -21,10 +21,9 @@ def convert_decimal_to_dms(decimal: float) -> dict:
 @mcp.tool()
 def calculate_azimuth(x1: float, y1: float, x2: float, y2: float) -> float:
     """Calculates the azimuth (bearing) from point 1 to point 2."""
-    dx = x2 - x1
-    dy = y2 - y1
-    azimuth = math.degrees(math.atan2(dy, dx))
-    return normalize_angle(azimuth)
+    p1 = Point(name="P1", x=x1, y=y1)
+    p2 = Point(name="P2", x=x2, y=y2)
+    return calculate_azimuth_from_points(p1, p2)
 
 @mcp.tool()
 def process_traverse(

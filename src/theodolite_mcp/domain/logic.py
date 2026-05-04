@@ -6,18 +6,36 @@ def normalize_angle(angle: float) -> float:
     return angle % 360
 
 def dms_to_decimal(degrees: int, minutes: int, seconds: float) -> float:
-    return degrees + minutes / 60 + seconds / 3600
+    sign = 1 if degrees >= 0 else -1
+    return degrees + sign * (minutes / 60 + seconds / 3600)
 
 def decimal_to_dms(decimal: float):
-    degrees = int(decimal)
-    minutes = int((decimal - degrees) * 60)
-    seconds = (decimal - degrees - minutes / 60) * 3600
-    return degrees, minutes, seconds
+    sign = 1 if decimal >= 0 else -1
+    abs_decimal = abs(decimal)
+    degrees = int(abs_decimal)
+    minutes = int((abs_decimal - degrees) * 60)
+    seconds = (abs_decimal - degrees - minutes / 60) * 3600
+    return sign * degrees, minutes, seconds
+
+def calculate_azimuth_from_points(p1: Point, p2: Point) -> float:
+    dx = p2.x - p1.x
+    dy = p2.y - p1.y
+    if abs(dx) < 1e-10 and abs(dy) < 1e-10:
+        raise ValueError("Points are identical; azimuth is undefined.")
+    # atan2(y, x) gives angle from X-axis towards Y-axis.
+    # In surveying, X is often North and Azimuth is clockwise from North.
+    # So we use atan2(dy, dx) where dx is North difference and dy is East difference.
+    azimuth = math.degrees(math.atan2(dy, dx))
+    return normalize_angle(azimuth)
 
 def calculate_traverse(data: TraverseData) -> TraverseResult:
     n = len(data.observations)
-    if n == 0:
-        raise ValueError("No observations provided")
+    if n < 1:
+        raise ValueError("At least one observation is required.")
+
+    for obs in data.observations:
+        if obs.distance < 0:
+            raise ValueError(f"Distance to {obs.point_name} cannot be negative.")
 
     total_dist = sum(obs.distance for obs in data.observations)
     
