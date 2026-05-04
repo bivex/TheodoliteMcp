@@ -104,7 +104,7 @@ def _draw_distances(ax, points: List[Point], fontsize: float = 7):
 
 def _draw_stamp(fig, title: str):
     # GOST 21.1101 standard stamp mockup (185x55mm usually, but scaled for plot)
-    ax_stamp = fig.add_axes([0.7, 0.05, 0.25, 0.15]) # Right bottom
+    ax_stamp = fig.add_axes([0.65, 0.05, 0.3, 0.15]) # Right bottom
     ax_stamp.set_xticks([])
     ax_stamp.set_yticks([])
     ax_stamp.set_facecolor("white")
@@ -114,25 +114,29 @@ def _draw_stamp(fig, title: str):
     # Grid for stamp
     ax_stamp.axhline(0.33, color="black", lw=1)
     ax_stamp.axhline(0.66, color="black", lw=1)
-    ax_stamp.axvline(0.4, color="black", lw=1)
+    ax_stamp.axvline(0.3, color="black", lw=1)
     
-    ax_stamp.text(0.05, 0.8, "Project:", fontsize=7, va="center")
-    ax_stamp.text(0.45, 0.8, title, fontsize=9, fontweight="bold", va="center")
+    # Text with wrapping for long titles
+    import textwrap
+    wrapped_title = "\n".join(textwrap.wrap(title, width=25))
     
-    ax_stamp.text(0.05, 0.5, "Stage:", fontsize=7, va="center")
-    ax_stamp.text(0.45, 0.5, "Draft (П)", fontsize=8, va="center")
+    ax_stamp.text(0.05, 0.8, "Проект:", fontsize=7, va="center")
+    ax_stamp.text(0.35, 0.8, wrapped_title, fontsize=8, fontweight="bold", va="center")
     
-    ax_stamp.text(0.05, 0.15, "Scale:", fontsize=7, va="center")
-    ax_stamp.text(0.45, 0.15, "1:Auto", fontsize=8, va="center")
+    ax_stamp.text(0.05, 0.5, "Стадия:", fontsize=7, va="center")
+    ax_stamp.text(0.35, 0.5, "Чертеж (П)", fontsize=8, va="center")
+    
+    ax_stamp.text(0.05, 0.15, "Масштаб:", fontsize=7, va="center")
+    ax_stamp.text(0.35, 0.15, "1:Авто", fontsize=8, va="center")
 
 
 def _draw_explication(fig, zones: List[Zone], total_area: float):
     # Legend / Explication of zones
-    ax_leg = fig.add_axes([0.05, 0.05, 0.25, 0.25]) # Left bottom
+    ax_leg = fig.add_axes([0.05, 0.05, 0.35, 0.25]) # Left bottom
     ax_leg.set_axis_off()
     
     y_pos = 0.95
-    ax_leg.text(0, y_pos, "ЭКСПЛИКАЦИЯ ЗОН", fontsize=10, fontweight="bold")
+    ax_leg.text(0, y_pos, "ЭКСПЛИКАЦИЯ ЗОН", fontsize=9, fontweight="bold")
     y_pos -= 0.1
     
     ax_leg.text(0, y_pos, f"Общая площадь: {total_area:.1f} м² ({total_area/100:.2f} сот.)", 
@@ -140,35 +144,43 @@ def _draw_explication(fig, zones: List[Zone], total_area: float):
     y_pos -= 0.1
     
     header_y = y_pos
-    ax_leg.text(0, header_y, "№", fontsize=8, fontweight="bold")
-    ax_leg.text(0.15, header_y, "Наименование", fontsize=8, fontweight="bold")
-    ax_leg.text(0.75, header_y, "S, м²", fontsize=8, fontweight="bold")
+    ax_leg.text(0, header_y, "№", fontsize=7, fontweight="bold")
+    ax_leg.text(0.1, header_y, "Наименование", fontsize=7, fontweight="bold")
+    ax_leg.text(0.7, header_y, "S, м²", fontsize=7, fontweight="bold")
     y_pos -= 0.08
     
     for i, zone in enumerate(zones):
-        if y_pos < 0.05: break
+        if y_pos < 0.05:
+            ax_leg.text(0, y_pos, "... и другие", fontsize=7, fontstyle="italic")
+            break
         area = calculate_area(zone.points) or 0
-        ax_leg.text(0, y_pos, str(i + 1), fontsize=8)
-        ax_leg.text(0.15, y_pos, zone.name[:20], fontsize=8)
-        ax_leg.text(0.75, y_pos, f"{area:.1f}", fontsize=8)
-        y_pos -= 0.07
+        name = zone.name if len(zone.name) < 25 else zone.name[:22] + "..."
+        ax_leg.text(0, y_pos, str(i + 1), fontsize=7)
+        ax_leg.text(0.1, y_pos, name, fontsize=7)
+        ax_leg.text(0.7, y_pos, f"{area:.1f}", fontsize=7)
+        y_pos -= 0.06
 
 
 def _draw_north_arrow(ax):
     # More professional north arrow
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
+    # Position relative to axes
     x = xlim[0] + (xlim[1] - xlim[0]) * 0.05
-    y = ylim[1] - (ylim[1] - ylim[0]) * 0.05
+    y = ylim[1] - (ylim[1] - ylim[0]) * 0.1
     
-    ax.annotate("", xy=(x, y + (ylim[1]-ylim[0])*0.05), xytext=(x, y),
+    arrow_len = (ylim[1] - ylim[0]) * 0.08
+    ax.annotate("", xy=(x, y + arrow_len), xytext=(x, y),
                 arrowprops=dict(arrowstyle="fancy", color="black", connectionstyle="arc3"))
-    ax.text(x, y + (ylim[1]-ylim[0])*0.07, "С", fontsize=12, fontweight="bold", ha="center")
+    ax.text(x, y + arrow_len + arrow_len*0.2, "С", fontsize=10, fontweight="bold", ha="center")
 
 
 def render_plot_plan(plan: PlotPlan) -> bytes:
-    fig = Figure(figsize=(plan.width_inches, plan.height_inches), dpi=plan.dpi)
-    # Increase bottom margin for stamp and explication
+    # Use higher DPI by default for better text rendering
+    dpi = plan.dpi if plan.dpi >= 150 else 150
+    fig = Figure(figsize=(plan.width_inches, plan.height_inches), dpi=dpi)
+    
+    # Refined layout with more space for margins
     ax = fig.add_axes([0.1, 0.35, 0.8, 0.55]) 
 
     all_points = list(plan.boundary_points)
@@ -187,15 +199,16 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     x_span = x_max - x_min or 1
     y_span = y_max - y_min or 1
     
-    # Grid snap for "surveyor" look
-    ax.set_xlim(x_min - x_span*0.2, x_max + x_span*0.2)
-    ax.set_ylim(y_min - y_span*0.2, y_max + y_span*0.2)
+    # Increase margins to prevent label cutoff
+    ax.set_xlim(x_min - x_span*0.25, x_max + x_span*0.25)
+    ax.set_ylim(y_min - y_span*0.25, y_max + y_span*0.25)
     ax.set_aspect("equal")
 
     # GOST grid
-    ax.grid(True, which="both", color="#CCCCCC", linestyle=":", linewidth=0.5, zorder=0)
-    ax.set_xlabel("X (m)", fontsize=8)
-    ax.set_ylabel("Y (m)", fontsize=8)
+    ax.grid(True, which="both", color="#DDDDDD", linestyle=":", linewidth=0.5, zorder=0)
+    ax.tick_params(labelsize=7)
+    ax.set_xlabel("X (m)", fontsize=7)
+    ax.set_ylabel("Y (m)", fontsize=7)
 
     if plan.zones:
         _draw_zones(ax, plan.zones)
@@ -214,7 +227,9 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     _draw_stamp(fig, plan.title)
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=plan.dpi, facecolor="white")
+    # Use bbox_inches=None to keep the fixed axes layout
+    fig.savefig(buf, format="png", dpi=dpi, facecolor="white")
     buf.seek(0)
     return buf.getvalue()
+
 
