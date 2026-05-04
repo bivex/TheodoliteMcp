@@ -1,0 +1,17 @@
+[project]
+name = "theodolite-mcp"
+version = "0.1.0"
+description = "MCP server for processing theodolite survey field books"
+authors = [
+    { name = "Gemini CLI", email = "gemini-cli@example.com" }
+]
+dependencies = [
+    "mcp>=0.1.0",
+    "pydantic>=2.0.0",
+    "numpy>=1.24.0",
+]
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
