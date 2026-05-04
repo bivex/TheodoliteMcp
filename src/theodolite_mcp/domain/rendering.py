@@ -33,6 +33,8 @@ TYPE_01 = "-"                                      # Continuous
 TYPE_02 = (0, (DS, GP))                            # Dashed
 TYPE_04 = (0, (LD, GP, DT, GP))                   # Long dashed dotted
 TYPE_05 = (0, (LD, GP, DT, GP, DT, GP))           # Long dashed double-dotted
+# ISO 128-25: 01+03 (Railway line) for tight bulkheads - approximated as a wide dashed-dotted or similar
+TYPE_RAILWAY = (0, (DS, DT, DS, DT)) 
 
 # Localization Dictionary
 I18N: Dict[str, Dict[str, str]] = {
@@ -122,38 +124,62 @@ def _get_hatch(name: str) -> Optional[str]:
     if any(k in name for k in ['парковка', 'parking', 'paving', 'дорожка']): return 'xxx'
     return None
 
-def _draw_boundary(ax, points: List[Point], color: str = 'black'):
-    # ISO 128-23, 04.3: Long dashed dotted extra-wide line (Boundary lines)
+def _draw_boundary(ax, points: List[Point], color: str = 'black', standard: str = "construction"):
+    # ISO 128-23 vs ISO 128-25
+    if standard == "shipbuilding":
+        # ISO 128-25, 01.2: Continuous wide line for outer plating/hull
+        lw = D_WIDE
+        ls = TYPE_01
+    else:
+        # ISO 128-23, 04.3: Long dashed dotted extra-wide line (Boundary lines)
+        lw = D_EXTRA_WIDE
+        ls = TYPE_04
+    
     xs, ys = _polygon_coords(points)
-    ax.plot(xs, ys, color=color, linewidth=D_EXTRA_WIDE, linestyle=TYPE_04, zorder=3)
+    ax.plot(xs, ys, color=color, linewidth=lw, linestyle=ls, zorder=3)
 
-def _draw_zones(ax, zones: List[Zone], show_areas: bool = False):
+def _draw_zones(ax, zones: List[Zone], show_areas: bool = False, standard: str = "construction"):
     for i, zone in enumerate(zones):
         color = zone.fill_color or _auto_color(i)
         hatch = _get_hatch(zone.name)
         xs, ys = _polygon_coords(zone.points)
         area = calculate_area(zone.points) or 0
+        name_lower = zone.name.lower()
         
         # 1. Color fill (ISO 128-50 toning)
         ax.fill(xs, ys, color=color, alpha=0.12, zorder=1)
         
         # 2. Hatching (ISO 128-50)
         if hatch:
-            # Matplotlib '/' is 45 deg by default. 
-            # For large areas (>300m2), we use a lighter density
-            h_density = hatch if area < 300 else hatch[0] # e.g., '///' -> '/'
+            h_density = hatch if area < 300 else hatch[0]
             ax.fill(xs, ys, fill=False, hatch=h_density, edgecolor='black', linewidth=0, alpha=0.15, zorder=2)
         
-        is_building = any(k in zone.name.lower() for k in ['дом', 'здание', 'building', 'house'])
-        
-        if is_building:
-            # ISO 128-23, 01.2: Continuous wide line
-            lw = D_WIDE
-            ls = TYPE_01
+        # 3. Line Style (ISO 128-23 vs ISO 128-25)
+        is_building = any(k in name_lower for k in ['дом', 'здание', 'building', 'house'])
+        is_bulkhead = any(k in name_lower for k in ['переборка', 'bulkhead', 'deck', 'палуба'])
+        is_tight = any(k in name_lower for k in ['tight', 'непрониц'])
+
+        if standard == "shipbuilding":
+            if is_tight:
+                # ISO 128-25: 01+03 Railway line for tight bulkheads
+                lw = D_WIDE
+                ls = TYPE_RAILWAY
+            elif is_bulkhead:
+                # ISO 128-25, 01.2: Continuous wide for structural members
+                lw = D_WIDE
+                ls = TYPE_01
+            else:
+                # ISO 128-25, 01.1: Continuous narrow for others
+                lw = D
+                ls = TYPE_01
         else:
-            # ISO 128-23, 04.3: Long dashed dotted extra-wide line (Boundary)
-            lw = D_EXTRA_WIDE
-            ls = TYPE_04
+            # Construction standard
+            if is_building:
+                lw = D_WIDE
+                ls = TYPE_01
+            else:
+                lw = D_EXTRA_WIDE
+                ls = TYPE_04
             
         ax.plot(xs, ys, color='black', linewidth=lw, linestyle=ls, zorder=3)
         
@@ -412,8 +438,8 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     ax_width_pt = plan.width_inches * 0.8 * 72
     m_per_pt = (x_max - x_min + x_span*0.56) / ax_width_pt if ax_width_pt > 0 else 0.1
     
-    if plan.zones: _draw_zones(ax, plan.zones, show_areas=plan.show_areas)
-    _draw_boundary(ax, plan.boundary_points)
+    if plan.zones: _draw_zones(ax, plan.zones, show_areas=plan.show_areas, standard=plan.standard)
+    _draw_boundary(ax, plan.boundary_points, standard=plan.standard)
     
     if plan.show_vertex_labels: _draw_vertex_labels(ax, plan.boundary_points)
     if plan.show_distances: 
