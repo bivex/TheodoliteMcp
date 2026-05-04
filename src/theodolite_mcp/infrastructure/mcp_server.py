@@ -1,10 +1,14 @@
-from mcp.server.fastmcp import FastMCP
-from ..domain.models import TraverseData, Point, Observation, StadiaMeasurement, TraverseResult
+from mcp.server.fastmcp import FastMCP, Image
+from ..domain.models import (
+    TraverseData, Point, Observation, StadiaMeasurement,
+    TraverseResult, Zone, PlotPlan, EDMParameters,
+)
 from ..application.services import SurveyService
 from ..domain.logic import (
-    dms_to_decimal, decimal_to_dms, normalize_angle, 
-    calculate_azimuth_from_points, calculate_stadia, 
-    calculate_inverse, generate_markdown_report, calculate_area
+    dms_to_decimal, decimal_to_dms, normalize_angle,
+    calculate_azimuth_from_points, calculate_stadia,
+    calculate_inverse, generate_markdown_report, calculate_area,
+    calculate_ppm_correction,
 )
 import math
 
@@ -126,28 +130,53 @@ def adjust_traverse_network(
         dump["report_md"] = generate_markdown_report(result)
         
     return dump
-    observations = [Observation(**obs) for obs in observations_json]
-    start_point = Point(name=start_name, x=start_x, y=start_y, z=start_z)
-    
-    end_point = None
-    if end_x is not None and end_y is not None:
-        end_point = Point(name=end_name or "END", x=end_x, y=end_y)
-        
-    data = TraverseData(
-        start_point=start_point,
-        end_point=end_point,
-        start_azimuth=start_azimuth,
-        observations=observations,
-        is_closed=is_closed
+
+@mcp.tool()
+def draw_plot_plan(
+    title: str = "Cadastral Plan",
+    boundary_json: list[dict] = [],
+    zones_json: list[dict] = [],
+    show_vertex_labels: bool = True,
+    show_distances: bool = True,
+    show_azimuths: bool = True,
+    show_areas: bool = True,
+    show_north_arrow: bool = True,
+    show_scale_bar: bool = True,
+    width: float = 10.0,
+    height: float = 10.0,
+    dpi: int = 150,
+) -> Image:
+    """
+    Generate a visual cadastral/site plan showing land plot boundaries,
+    zone areas, distance labels, azimuth labels, north arrow, and scale bar.
+    Returns a PNG image.
+    """
+    boundary_points = [Point(**pt) for pt in boundary_json]
+    zones = []
+    for z in zones_json:
+        pts = [Point(**p) for p in z.get("points", [])]
+        zones.append(Zone(
+            name=z.get("name", "Zone"),
+            points=pts,
+            fill_color=z.get("fill_color"),
+            fill_alpha=z.get("fill_alpha", 0.3),
+        ))
+    plan = PlotPlan(
+        title=title,
+        boundary_points=boundary_points,
+        zones=zones,
+        show_vertex_labels=show_vertex_labels,
+        show_distances=show_distances,
+        show_azimuths=show_azimuths,
+        show_areas=show_areas,
+        show_north_arrow=show_north_arrow,
+        show_scale_bar=show_scale_bar,
+        width_inches=width,
+        height_inches=height,
+        dpi=dpi,
     )
-    
-    result = service.process_theodolite_traverse(data)
-    dump = result.model_dump()
-    
-    if generate_report:
-        dump["report_md"] = generate_markdown_report(result)
-        
-    return dump
+    png_bytes = service.render_plot(plan)
+    return Image(data=png_bytes, format="png")
 
 if __name__ == "__main__":
     mcp.run()

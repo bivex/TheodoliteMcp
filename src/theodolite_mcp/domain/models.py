@@ -51,3 +51,26 @@ class TraverseResult(BaseModel):
     total_length: float
     area: Optional[float] = None
     precision_status: Optional[str] = None
+
+
+class Zone(BaseModel):
+    name: str
+    points: List[Point]
+    fill_color: Optional[str] = None
+    fill_alpha: float = 0.3
+
+
+class PlotPlan(BaseModel):
+    title: str = "Cadastral Plan"
+    boundary_points: List[Point]
+    zones: List[Zone] = []
+    show_vertex_labels: bool = True
+    show_distances: bool = True
+    show_azimuths: bool = True
+    show_areas: bool = True
+    show_north_arrow: bool = True
+    show_scale_bar: bool = True
+    coordinate_labels: bool = False
+    width_inches: float = 10.0
+    height_inches: float = 10.0
+    dpi: int = 150
