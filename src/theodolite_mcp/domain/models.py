@@ -59,12 +59,12 @@ class Zone(BaseModel):
     fill_color: Optional[str] = None
     fill_alpha: float = 0.3
 
-
 class PlotPlan(BaseModel):
     title: str = "Cadastral Plan"
     boundary_points: List[Point]
     zones: List[Zone] = []
-    language: str = "ru"  # "ru" or "en"
+    language: str = "ru"  # "ru", "uk", "en"
+    standard: str = "construction"  # "construction" (ISO 128-23) or "shipbuilding" (ISO 129-4)
     show_vertex_labels: bool = True
     show_distances: bool = True
     show_azimuths: bool = True
@@ -75,3 +75,4 @@ class PlotPlan(BaseModel):
     width_inches: float = 10.0
     height_inches: float = 10.0
     dpi: int = 150
+

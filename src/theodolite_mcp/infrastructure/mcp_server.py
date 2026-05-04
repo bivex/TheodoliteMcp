@@ -137,6 +137,7 @@ def draw_plot_plan(
     boundary_json: list[dict] = [],
     zones_json: list[dict] = [],
     language: str = "ru",
+    standard: str = "construction",
     show_vertex_labels: bool = True,
     show_distances: bool = True,
     show_azimuths: bool = True,
@@ -151,6 +152,7 @@ def draw_plot_plan(
     Generate a visual cadastral/site plan showing land plot boundaries, 
     zone areas, distance labels, azimuth labels, north arrow, and scale bar.
     Returns a PNG image.
+    Standard options: 'construction' (ISO 128-23), 'shipbuilding' (ISO 129-4).
     """
     boundary_points = [Point(**pt) for pt in boundary_json]
     zones = []
@@ -167,6 +169,7 @@ def draw_plot_plan(
         boundary_points=boundary_points,
         zones=zones,
         language=language,
+        standard=standard,
         show_vertex_labels=show_vertex_labels,
         show_distances=show_distances,
         show_azimuths=show_azimuths,
