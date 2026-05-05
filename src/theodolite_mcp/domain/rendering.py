@@ -511,36 +511,63 @@ def _draw_stamp(fig, plan: PlotPlan, scale_str: str, pw_mm: float, ph_mm: float,
 
 def _draw_explication(fig, zones: List[Zone], total_area: float, pw_mm: float, ph_mm: float, lang: str = "ru"):
     texts = I18N.get(lang, I18N["ru"])
-    # Position: Bottom Left of the inner frame, next to Margin Left
-    width_mm = 80.0
-    height_mm = STAMP_HEIGHT
+    # Position: Bottom Left of the inner frame
+    width_mm = 85.0
+    row_h = 6.0
+    header_h = 8.0
+    title_h = 10.0
+    
+    # Calculate total table height
+    num_rows = min(len(zones), 15) # Cap for visual space
+    table_h = title_h + header_h + (num_rows + 1) * row_h # +1 for total area row
+    
     left_mm = MARGIN_LEFT
     bottom_mm = MARGIN_OTHER
     
-    ax_leg = fig.add_axes([left_mm / pw_mm, bottom_mm / ph_mm, width_mm / pw_mm, height_mm / ph_mm])
-    ax_leg.set_axis_off()
+    ax_leg = fig.add_axes([left_mm / pw_mm, bottom_mm / ph_mm, width_mm / pw_mm, table_h / ph_mm])
+    ax_leg.set_xticks([]); ax_leg.set_yticks([]); ax_leg.set_facecolor('none')
+    for spine in ax_leg.spines.values(): spine.set_linewidth(D/MM_TO_PT)
     
-    y_pos = 0.95
-    ax_leg.text(0, y_pos, texts["explication"], fontproperties=_get_font(8, bold=True, italic=True))
-    y_pos -= 0.12
-    ax_leg.text(0, y_pos, f"{texts['total_area']} {total_area:.1f} м²", fontproperties=_get_font(7, bold=True, italic=True))
-    y_pos -= 0.12
+    # Column widths (relative)
+    c1, c2, c3 = 0.12, 0.68, 0.2
     
-    # Headers
-    ax_leg.text(0, y_pos, texts["num"], fontproperties=_get_font(6.5, bold=True, italic=True))
-    ax_leg.text(0.12, y_pos, texts["name"], fontproperties=_get_font(6.5, bold=True, italic=True))
-    ax_leg.text(0.8, y_pos, texts["area_sqm"], fontproperties=_get_font(6.5, bold=True, italic=True))
-    y_pos -= 0.1
+    y = 1.0
+    # Title row
+    ax_leg.axhline(y, color='black', lw=D_WIDE/MM_TO_PT)
+    ax_leg.text(0.5, y - (title_h/table_h)/2, texts["explication"], 
+                fontproperties=_get_font(8, bold=True), ha='center', va='center')
+    y -= (title_h/table_h)
     
-    for i, zone in enumerate(zones):
-        if y_pos < 0.05:
-            ax_leg.text(0, y_pos, texts["others"], fontproperties=_get_font(6, italic=True))
-            break
+    # Header row
+    ax_leg.axhline(y, color='black', lw=D_WIDE/MM_TO_PT)
+    h_y = y - (header_h/table_h)/2
+    ax_leg.text(c1/2, h_y, texts["num"], fontproperties=_get_font(6.5, bold=True), ha='center', va='center')
+    ax_leg.text(c1 + c2/2, h_y, texts["name"], fontproperties=_get_font(6.5, bold=True), ha='center', va='center')
+    ax_leg.text(c1 + c2 + c3/2, h_y, texts["area_sqm"], fontproperties=_get_font(6.5, bold=True), ha='center', va='center')
+    y -= (header_h/table_h)
+    
+    # Data rows
+    for i in range(num_rows):
+        zone = zones[i]
         area = calculate_area(zone.points) or 0
-        ax_leg.text(0, y_pos, str(i + 1), fontproperties=_get_font(6.5, italic=True))
-        ax_leg.text(0.12, y_pos, zone.name[:18], fontproperties=_get_font(6.5, italic=True))
-        ax_leg.text(0.8, y_pos, f'{area:.1f}', fontproperties=_get_font(6.5, italic=True))
-        y_pos -= 0.08
+        ax_leg.axhline(y, color='black', lw=D/MM_TO_PT)
+        row_y = y - (row_h/table_h)/2
+        ax_leg.text(c1/2, row_y, str(i + 1), fontproperties=_get_font(6.5), ha='center', va='center')
+        ax_leg.text(c1 + 0.02, row_y, zone.name[:24], fontproperties=_get_font(6.5), ha='left', va='center')
+        ax_leg.text(c1 + c2 + c3/2, row_y, f'{area:.1f}', fontproperties=_get_font(6.5), ha='center', va='center')
+        y -= (row_h/table_h)
+    
+    # Total Area Row
+    ax_leg.axhline(y, color='black', lw=D_WIDE/MM_TO_PT)
+    row_y = y - (row_h/table_h)/2
+    ax_leg.text(c1 + c2/2, row_y, texts["total_area"], fontproperties=_get_font(7, bold=True), ha='center', va='center')
+    ax_leg.text(c1 + c2 + c3/2, row_y, f'{total_area:.1f}', fontproperties=_get_font(7, bold=True), ha='center', va='center')
+    y -= (row_h/table_h)
+    ax_leg.axhline(y, color='black', lw=D_WIDE/MM_TO_PT)
+    
+    # Vertical lines
+    ax_leg.axvline(c1, color='black', lw=D/MM_TO_PT, ymin=y, ymax=1-(title_h/table_h))
+    ax_leg.axvline(c1+c2, color='black', lw=D/MM_TO_PT, ymin=y, ymax=1-(title_h/table_h))
 
 def _draw_north_arrow(ax, lang: str = "ru"):
     texts = I18N.get(lang, I18N["ru"])
@@ -550,6 +577,52 @@ def _draw_north_arrow(ax, lang: str = "ru"):
     arrow_len = (ylim[1] - ylim[0]) * 0.06
     ax.annotate('', xy=(x, y + arrow_len), xytext=(x, y), arrowprops=dict(arrowstyle='fancy', color='black', linewidth=D_SYMBOL))
     ax.text(x, y + arrow_len + arrow_len*0.3, texts["north"], fontproperties=_get_font(9, bold=True), ha='center')
+
+def _draw_sheet_reference_grid(ax_frame, pw_mm: float, ph_mm: float):
+    """ISO 5457:1999 - Reference grid (A-B-C / 1-2-3) and Centering Marks."""
+    # 1. Centering Marks (5mm long, Wide line)
+    mark_len = 5.0
+    # Top
+    ax_frame.plot([pw_mm/2, pw_mm/2], [ph_mm, ph_mm - mark_len], color='black', lw=D_WIDE/MM_TO_PT)
+    # Bottom
+    ax_frame.plot([pw_mm/2, pw_mm/2], [0, mark_len], color='black', lw=D_WIDE/MM_TO_PT)
+    # Left
+    ax_frame.plot([0, mark_len], [ph_mm/2, ph_mm/2], color='black', lw=D_WIDE/MM_TO_PT)
+    # Right
+    ax_frame.plot([pw_mm, pw_mm - mark_len], [ph_mm/2, ph_mm/2], color='black', lw=D_WIDE/MM_TO_PT)
+
+    # 2. Reference Grid (approx 50mm segments)
+    # Horizontal (Numbers 1, 2, 3...)
+    h_segments = int((pw_mm - MARGIN_LEFT - MARGIN_OTHER) / 50) or 1
+    h_step = (pw_mm - MARGIN_LEFT - MARGIN_OTHER) / h_segments
+    for i in range(h_segments):
+        x = MARGIN_LEFT + i * h_step + h_step/2
+        # Top label
+        ax_frame.text(x, ph_mm - MARGIN_OTHER/2, str(i + 1), fontproperties=_get_font(5), ha='center', va='center')
+        # Bottom label
+        ax_frame.text(x, MARGIN_OTHER/2, str(i + 1), fontproperties=_get_font(5), ha='center', va='center')
+        # Ticks
+        if i > 0:
+            tx = MARGIN_LEFT + i * h_step
+            ax_frame.plot([tx, tx], [ph_mm, ph_mm - MARGIN_OTHER], color='black', lw=D/MM_TO_PT)
+            ax_frame.plot([tx, tx], [0, MARGIN_OTHER], color='black', lw=D/MM_TO_PT)
+
+    # Vertical (Letters A, B, C...)
+    v_segments = int((ph_mm - 2 * MARGIN_OTHER) / 50) or 1
+    v_step = (ph_mm - 2 * MARGIN_OTHER) / v_segments
+    letters = "ABCDEFGHJKLMNPQRSTUVWXYZ" # ISO 5457 skips I and O
+    for i in range(v_segments):
+        y = ph_mm - MARGIN_OTHER - i * v_step - v_step/2
+        char = letters[i % len(letters)]
+        # Left label
+        ax_frame.text(MARGIN_LEFT/2, y, char, fontproperties=_get_font(5), ha='center', va='center')
+        # Right label
+        ax_frame.text(pw_mm - MARGIN_OTHER/2, y, char, fontproperties=_get_font(5), ha='center', va='center')
+        # Ticks
+        if i > 0:
+            ty = ph_mm - MARGIN_OTHER - i * v_step
+            ax_frame.plot([0, MARGIN_LEFT], [ty, ty], color='black', lw=D/MM_TO_PT)
+            ax_frame.plot([pw_mm, pw_mm - MARGIN_OTHER], [ty, ty], color='black', lw=D/MM_TO_PT)
 
 def render_plot_plan(plan: PlotPlan) -> bytes:
     dpi = plan.dpi if plan.dpi >= 150 else 300
@@ -575,7 +648,10 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
                            fill=False, color='black', linewidth=D_WIDE/MM_TO_PT)
     ax_frame.add_patch(frame_rect)
     
-    # 3. Calculate Scale (ISO 5455)
+    # 3. Draw Reference Grid (ISO 5457)
+    _draw_sheet_reference_grid(ax_frame, pw_mm, ph_mm)
+    
+    # 4. Calculate Scale (ISO 5455)
     all_points = list(plan.boundary_points)
     for zone in plan.zones: all_points.extend(zone.points)
     
