@@ -176,6 +176,7 @@ def draw_plot_plan(
         show_areas=show_areas,
         show_north_arrow=show_north_arrow,
         show_scale_bar=show_scale_bar,
+        coordinate_labels=coordinate_labels,
         width_inches=width,
         height_inches=height,
         dpi=dpi,
