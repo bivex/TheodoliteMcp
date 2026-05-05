@@ -1,5 +1,5 @@
 from mcp.server.fastmcp import FastMCP, Image
-from ..domain.models import (
+from theodolite_mcp.domain.models import (
     TraverseData, Point, Observation, StadiaMeasurement,
     TraverseResult, Zone, PlotPlan, EDMParameters,
     ProfilePlan, ProfilePoint,
@@ -288,6 +288,7 @@ def draw_interior_plan(
     language: str = "ru",
     paper_format: str = "A4",
     scale: int = 50,
+    output_path: str = None,
 ) -> Image:
     """
     Generates a professional architectural floor plan (PNG).
@@ -326,7 +327,7 @@ def draw_interior_plan(
         paper_format=paper_format,
         scale=scale
     )
-    png_bytes = service.render_interior(plan)
+    png_bytes = service.render_interior(plan, output_path=output_path)
     return Image(data=png_bytes, format="png")
 
 @mcp.tool()

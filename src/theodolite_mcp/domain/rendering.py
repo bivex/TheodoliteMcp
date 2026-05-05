@@ -10,7 +10,7 @@ import matplotlib.patches as patches
 from matplotlib.font_manager import FontProperties
 import textwrap
 
-from .models import PlotPlan, Point, Zone, AsBuiltPoint, VolumeGrid, ProfilePlan, ProfilePoint, InteriorPlan, Wall, Opening, Room, FurnitureItem
+from theodolite_mcp.domain.models import PlotPlan, Point, Zone, AsBuiltPoint, VolumeGrid, ProfilePlan, ProfilePoint, InteriorPlan, Wall, Opening, Room, FurnitureItem
 from .logic import calculate_azimuth_from_points, calculate_area
 
 # --- ISO 128-20:1996 & ISO 128-23:1999 Standards Constants ---

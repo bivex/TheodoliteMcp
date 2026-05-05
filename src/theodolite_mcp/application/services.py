@@ -1,5 +1,7 @@
-from typing import List, Dict
-from ..domain.models import TraverseData, TraverseResult, PlotPlan, ProfilePlan, InteriorPlan
+import os
+from pathlib import Path
+from typing import List, Dict, Optional
+from theodolite_mcp.domain.models import TraverseData, TraverseResult, PlotPlan, ProfilePlan, InteriorPlan
 from ..domain.logic import calculate_traverse
 from ..domain.rendering import render_plot_plan, render_profile_plan, render_interior_plan
 from ..domain.dxf_export import export_plan_to_dxf, export_profile_to_dxf
@@ -10,17 +12,25 @@ from ..domain.geodesy import (
 )
 
 class SurveyService:
+    def _save_if_needed(self, data: bytes, path: Optional[str]) -> bytes:
+        if path:
+            output_dir = Path(path).parent
+            output_dir.mkdir(parents=True, exist_ok=True)
+            with open(path, "wb") as f:
+                f.write(data)
+        return data
+
     def process_theodolite_traverse(self, data: TraverseData) -> TraverseResult:
         return calculate_traverse(data)
 
-    def render_plot(self, plan: PlotPlan) -> bytes:
-        return render_plot_plan(plan)
+    def render_plot(self, plan: PlotPlan, output_path: Optional[str] = None) -> bytes:
+        return self._save_if_needed(render_plot_plan(plan), output_path)
 
-    def render_profile(self, plan: ProfilePlan) -> bytes:
-        return render_profile_plan(plan)
+    def render_profile(self, plan: ProfilePlan, output_path: Optional[str] = None) -> bytes:
+        return self._save_if_needed(render_profile_plan(plan), output_path)
 
-    def render_interior(self, plan: InteriorPlan) -> bytes:
-        return render_interior_plan(plan)
+    def render_interior(self, plan: InteriorPlan, output_path: Optional[str] = None) -> bytes:
+        return self._save_if_needed(render_interior_plan(plan), output_path)
 
     def export_dxf(self, plan: PlotPlan, output_path: str) -> str:
         return export_plan_to_dxf(plan, output_path)

@@ -1,5 +1,5 @@
 import ezdxf
-from .models import PlotPlan, Point, Zone, ProfilePlan
+from theodolite_mcp.domain.models import PlotPlan, Point, Zone, ProfilePlan
 import os
 
 def export_plan_to_dxf(plan: PlotPlan, output_path: str):

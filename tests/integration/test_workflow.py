@@ -43,13 +43,13 @@ def test_full_survey_workflow_integration():
     assert len(result["points"]) == 5 # P1, P2, P3, P4, P1_final
     
     # Verify square coordinates
-    # North=0 convention:
+    # Surveying convention (X=North, Y=East):
     # 1. P1->P2: StartAz=0, Angle=90. NewAz = 0 + 90 - 180 = -90 = 270 (West). 
-    #    dx = 100 * sin(270) = -100, dy = 100 * cos(270) = 0.
-    #    P2: (-100, 0)
+    #    dx (North) = 100 * cos(270) = 0, dy (East) = 100 * sin(270) = -100.
+    #    P2: (0, -100)
     p2 = result["points"][1]
-    assert p2["x"] == pytest.approx(-100.0)
-    assert p2["y"] == pytest.approx(0.0)
+    assert p2["x"] == pytest.approx(0.0, abs=1e-4)
+    assert p2["y"] == pytest.approx(-100.0, abs=1e-4)
     
     # 3. Rendering Integration
     # Take the points and render a plan

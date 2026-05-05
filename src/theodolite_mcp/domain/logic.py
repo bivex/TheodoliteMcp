@@ -1,6 +1,6 @@
 import math
 from typing import List
-from .models import TraverseData, TraverseResult, Point, Observation, StadiaMeasurement, StadiaResult, EDMParameters
+from theodolite_mcp.domain.models import TraverseData, TraverseResult, Point, Observation, StadiaMeasurement, StadiaResult, EDMParameters
 
 def normalize_angle(angle: float) -> float:
     return angle % 360
@@ -18,12 +18,13 @@ def decimal_to_dms(decimal: float):
     return sign * degrees, minutes, seconds
 
 def calculate_azimuth_from_points(p1: Point, p2: Point) -> float:
-    dx = p2.x - p1.x # East
-    dy = p2.y - p1.y # North
+    dx = p2.x - p1.x # North difference
+    dy = p2.y - p1.y # East difference
     if abs(dx) < 1e-10 and abs(dy) < 1e-10:
         raise ValueError("Points are identical; azimuth is undefined.")
-    # In surveying, Azimuth = atan2(East, North)
-    azimuth = math.degrees(math.atan2(dx, dy))
+    # In surveying, X is often North and Azimuth is clockwise from North.
+    # So we use atan2(East, North) -> atan2(dy, dx)
+    azimuth = math.degrees(math.atan2(dy, dx))
     return normalize_angle(azimuth)
 
 def calculate_area(points: List[Point]) -> float:
@@ -111,9 +112,34 @@ def apply_combined_factor(distance: float, elevation: float, grid_factor: float)
     combined_factor = sea_level_factor * grid_factor
     return distance * combined_factor
 
+def _calculate_angular_misclosure(data: TraverseData, n_traverse: int, angles: List[float]) -> float:
+    if data.is_closed:
+        actual_sum = sum(angles)
+        theoretical_int = (n_traverse - 2) * 180
+        theoretical_ext = (n_traverse + 2) * 180
+        mis_int = actual_sum - theoretical_int
+        mis_ext = actual_sum - theoretical_ext
+        return mis_int if abs(mis_int) < abs(mis_ext) else mis_ext
+    
+    if data.closing_azimuth is not None:
+        calc_closing = normalize_angle(data.start_azimuth + sum(angles) - n_traverse * 180)
+        mis = calc_closing - data.closing_azimuth
+        if mis > 180: mis -= 360
+        if mis < -180: mis += 360
+        return mis
+    
+    return 0.0
+
+def _calculate_azimuths(start_az: float, adj_angles: List[float]) -> List[float]:
+    azimuths = []
+    current_az = start_az
+    for angle in adj_angles:
+        current_az = normalize_angle(current_az + angle - 180)
+        azimuths.append(current_az)
+    return azimuths
+
 def calculate_traverse(data: TraverseData) -> TraverseResult:
     traverse_obs = [o for o in data.observations if not o.is_sideshot]
-    sideshot_obs = [o for o in data.observations if o.is_sideshot]
     n_traverse = len(traverse_obs)
     if n_traverse < 1:
         raise ValueError("At least one main traverse observation is required.")
@@ -126,43 +152,19 @@ def calculate_traverse(data: TraverseData) -> TraverseResult:
     
     # 1. Angular adjustment
     angles = [obs.horizontal_angle for obs in traverse_obs]
-    angular_misclosure = 0.0
-    if data.is_closed:
-        actual_sum = sum(angles)
-        theoretical_int = (n_traverse - 2) * 180
-        theoretical_ext = (n_traverse + 2) * 180
-        
-        mis_int = actual_sum - theoretical_int
-        mis_ext = actual_sum - theoretical_ext
-        
-        # Use the one with the smallest absolute error
-        if abs(mis_int) < abs(mis_ext):
-            angular_misclosure = mis_int
-        else:
-            angular_misclosure = mis_ext
-    elif data.closing_azimuth is not None:
-        # Sum of angles adjustment for open traverse connecting two known azimuths
-        # Az_final = Az_initial + Sum(Angles) - n*180
-        calc_closing = normalize_angle(data.start_azimuth + sum(angles) - n_traverse * 180)
-        angular_misclosure = calc_closing - data.closing_azimuth
-        if angular_misclosure > 180: angular_misclosure -= 360
-        if angular_misclosure < -180: angular_misclosure += 360
+    angular_misclosure = _calculate_angular_misclosure(data, n_traverse, angles)
     
     correction = -angular_misclosure / n_traverse
     adj_angles = [a + correction for a in angles]
 
     # 2. Calculate Azimuths for main traverse
-    azimuths = []
-    current_az = data.start_azimuth
-    for angle in adj_angles:
-        current_az = normalize_angle(current_az + angle - 180)
-        azimuths.append(current_az)
+    azimuths = _calculate_azimuths(data.start_azimuth, adj_angles)
 
     # 3. Calculate Increments for main traverse
-    # Surveying convention: North = 0 deg (Y axis), East = 90 deg (X axis)
-    # dy (North) = dist * cos(az), dx (East) = dist * sin(az)
-    dxs = [obs.distance * math.sin(math.radians(az)) for obs, az in zip(traverse_obs, azimuths)]
-    dys = [obs.distance * math.cos(math.radians(az)) for obs, az in zip(traverse_obs, azimuths)]
+    # Surveying convention: North = 0 deg (X axis), East = 90 deg (Y axis)
+    # dx (North) = dist * cos(az), dy (East) = dist * sin(az)
+    dxs = [obs.distance * math.cos(math.radians(az)) for obs, az in zip(traverse_obs, azimuths)]
+    dys = [obs.distance * math.sin(math.radians(az)) for obs, az in zip(traverse_obs, azimuths)]
 
     # 4. Linear Misclosure
     sum_dx, sum_dy = sum(dxs), sum(dys)
@@ -190,12 +192,6 @@ def calculate_traverse(data: TraverseData) -> TraverseResult:
         cy += dys[i]
         points.append(Point(name=traverse_obs[i].point_name, x=cx, y=cy))
 
-    # 7. Process Side-Shots (Topography)
-    # Side-shots are measured from stations. For simplicity, we assume they are measured 
-    # from the station they follow in the sequence. 
-    # (In a real field book, they'd be linked to a specific station ID).
-    # Let's assume for this engine that sideshots are calculated from the *current* station.
-    
     # 8. Final Area & Status
     area = calculate_area(points[:-1] if data.is_closed else points)
     status = evaluate_precision(relative_precision)
