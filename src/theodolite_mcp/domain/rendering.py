@@ -264,7 +264,8 @@ def _draw_leader(ax, target_x: float, target_y: float, text: str,
     ax.text(lx + shelf_dir * shelf_len/2, ly + 2*d_m, text, 
             fontsize=fontsize, ha='center', va='bottom', zorder=10)
 
-def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8, standard: str = "construction", m_per_pt: float = 0.1):
+def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8, standard: str = "construction", 
+                        m_per_pt: float = 0.1, show_coords: bool = False):
     cx, cy = _centroid(points)
     used_positions = []
     used_points = []
@@ -276,6 +277,9 @@ def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8, standard: 
         used_points.append((p.x, p.y))
 
         name = p.name
+        if show_coords:
+            name += f"\n({p.x:.2f}, {p.y:.2f})"
+            
         if standard == "shipbuilding" and name.isdigit():
             name = f"FR{name}"
             
@@ -515,7 +519,9 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     if plan.zones: _draw_zones(ax, plan.zones, show_areas=plan.show_areas, standard=plan.standard, m_per_pt=m_per_pt)
     _draw_boundary(ax, plan.boundary_points, standard=plan.standard)
     
-    if plan.show_vertex_labels: _draw_vertex_labels(ax, plan.boundary_points, standard=plan.standard, m_per_pt=m_per_pt)
+    if plan.show_vertex_labels: 
+        _draw_vertex_labels(ax, plan.boundary_points, standard=plan.standard, 
+                           m_per_pt=m_per_pt, show_coords=plan.coordinate_labels)
     if plan.show_distances: 
         _draw_distances(ax, plan.boundary_points, standard=plan.standard, fontsize=7.5, 
                         show_azimuths=plan.show_azimuths, m_per_pt=m_per_pt)
