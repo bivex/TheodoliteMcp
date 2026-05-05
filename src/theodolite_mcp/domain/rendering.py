@@ -169,24 +169,66 @@ def _perpendicular_offset(p1: Point, p2: Point, distance: float = 1.0) -> Tuple[
     return nx, ny
 
 def _get_hatch(name: str) -> Optional[str]:
-    """ISO 128-50: Material hatching patterns."""
+    """ISO 128-50 & GOST 2.306-68: Material hatching patterns."""
     name = name.lower()
-    # Brick (Brickwork): ISO 128-50 pattern 01 (Diagonal lines)
-    if any(k in name for k in ['кирпич', 'brick']): return '///'
-    # Concrete: ISO 128-50 pattern 02 (Dots/triangles)
-    if any(k in name for k in ['бетон', 'concrete', 'фундамент', 'foundation']): return '...'
-    # Wood: ISO 128-50 pattern 05 (Curved lines/grain) - approximated as 'oo'
-    if any(k in name for k in ['дерево', 'wood', 'timber']): return 'oo'
-    # Metal/Steel: ISO 128-50 pattern 03 (Double diagonal)
-    if any(k in name for k in ['металл', 'metal', 'сталь', 'steel']): return '///' 
     
-    # Generic buildings
-    if any(k in name for k in ['дом', 'house', 'building', 'здание']): return '//'
+    # === 1. MATERIAL SECTION SYMBOLS (Materials in cut) ===
     
-    # Landscaping
-    if any(k in name for k in ['огород', 'garden', 'planting', 'теплица']): return '..'
-    if any(k in name for k in ['сад', 'orchard', 'trees', 'цветник']): return 'o'
-    if any(k in name for k in ['парковка', 'parking', 'paving', 'дорожка']): return 'xxxx'
+    # Concrete: ISO 128-50 pattern 02 + 09. 'o.' perfectly simulates concrete with stones/dots.
+    if any(k in name for k in ['бетон', 'concrete', 'фундамент', 'foundation', 'жб', 'железобетон']): 
+        return 'o.'
+        
+    # Sand / Fill: Only dots.
+    if any(k in name for k in ['песок', 'sand', 'засыпка']): 
+        return '...'
+        
+    # Soil / Earth: Grid pattern for earth in section.
+    if any(k in name for k in ['грунт', 'земля', 'earth', 'soil', 'почва']): 
+        return '+x'
+    
+    # Brick / Masonry: ISO 128-50 pattern 01 (Diagonal lines).
+    if any(k in name for k in ['кирпич', 'brick', 'камень', 'stone', 'кладка']): 
+        return '//'
+        
+    # Metal: ISO 128-50 pattern 03. Frequent diagonal lines.
+    if any(k in name for k in ['металл', 'metal', 'сталь', 'steel', 'железо', 'iron']): 
+        return '////'
+        
+    # Non-metals / Plastics: ISO 128-50 pattern 04 (Cross-hatching).
+    if any(k in name for k in ['пластик', 'plastic', 'резина', 'rubber', 'полимер']): 
+        return 'xx'
+        
+    # Wood (Cross-section): Concentric circles/grain.
+    if any(k in name for k in ['дерево', 'wood', 'timber', 'брус', 'доска']): 
+        return 'O' 
+        
+    # Glass / Transparent: ISO 128-50 pattern 08. Rare reverse diagonal.
+    if any(k in name for k in ['стекло', 'glass', 'окно', 'window']): 
+        return '\\'
+
+    # Water / Liquid: ISO 128-50 pattern 07 (Horizontal lines).
+    if any(k in name for k in ['вода', 'water', 'бассейн', 'pool', 'пруд']): 
+        return '--'
+
+
+    # === 2. SITE PLAN ZONING (View from above) ===
+    
+    # Buildings (generic top view)
+    if any(k in name for k in ['дом', 'house', 'building', 'здание']): 
+        return '///'
+    
+    # Paving / Parking / Paths
+    if any(k in name for k in ['парковка', 'parking', 'paving', 'дорожка', 'асфальт', 'asphalt']): 
+        return 'xx'
+        
+    # Landscaping: Grass / Garden
+    if any(k in name for k in ['огород', 'garden', 'planting', 'теплица', 'газон', 'grass']): 
+        return '..'
+        
+    # Landscaping: Trees / Orchard
+    if any(k in name for k in ['сад', 'orchard', 'trees', 'цветник', 'лес', 'forest']): 
+        return 'o'
+        
     return None
 
 def _draw_boundary(ax, points: List[Point], color: str = 'black', standard: str = "construction"):
