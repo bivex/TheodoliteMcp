@@ -317,13 +317,13 @@ def draw_interior_plan(
             points=pts
         ))
     
-    furniture = [FurnitureItem(type=f["type"], center_pt=Point(**f["center_pt"]), width=f["width"], length=f["length"], rotation=f.get("rotation", 0.0)) for f in furniture_json]
+    # furniture = [FurnitureItem(type=f["type"], center_pt=Point(**f["center_pt"]), width=f["width"], length=f["length"], rotation=f.get("rotation", 0.0)) for f in furniture_json]
         
     plan = InteriorPlan(
         title=title,
         walls=walls,
         rooms=rooms,
-        furniture=furniture,
+        # furniture=furniture,
         language=language,
         paper_format=paper_format,
         scale=scale
