@@ -4,8 +4,6 @@ import os
 from typing import List, Optional, Tuple, Dict
 import matplotlib
 matplotlib.use('Agg')
-# ISO 128-50: Hatching line width should be narrow (d = 0.35mm)
-matplotlib.rcParams['hatch.linewidth'] = D / MM_TO_PT 
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 import matplotlib.patches as patches
@@ -48,6 +46,7 @@ def _get_font(size=7, bold=False, italic=False):
     return {'fontsize': size, 'fontweight': 'bold' if bold else 'normal', 'style': 'italic' if italic else 'normal'}
 
 D = 0.35 * MM_TO_PT          # Narrow (d)
+matplotlib.rcParams['hatch.linewidth'] = D / MM_TO_PT # ISO 128-50
 D_WIDE = 0.7 * MM_TO_PT      # Wide (2d)
 D_EXTRA_WIDE = 1.4 * MM_TO_PT # Extra-wide (4d)
 D_SYMBOL = 0.5 * MM_TO_PT    # Graphical Symbols
