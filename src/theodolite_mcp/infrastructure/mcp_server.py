@@ -2,6 +2,7 @@ from mcp.server.fastmcp import FastMCP, Image
 from ..domain.models import (
     TraverseData, Point, Observation, StadiaMeasurement,
     TraverseResult, Zone, PlotPlan, EDMParameters,
+    ProfilePlan, ProfilePoint
 )
 from ..domain.least_squares import ObservationLS
 from ..application.services import SurveyService
@@ -222,6 +223,31 @@ def export_to_dxf(
     
     path = service.export_dxf(plan, full_path)
     return f"✅ DXF file successfully exported to: {os.path.abspath(path)}"
+
+@mcp.tool()
+def draw_longitudinal_profile(
+    title: str = "Longitudinal Profile",
+    points_json: list[dict] = [],
+    language: str = "ru",
+    paper_format: str = "A3",
+    h_scale: int = 1000,
+    v_scale: int = 100,
+) -> Image:
+    """
+    Generates a professional longitudinal profile (PNG) for pipelines or roads.
+    Includes the 'podval' table with stations, distances, and elevations.
+    """
+    pts = [ProfilePoint(**p) for p in points_json]
+    plan = ProfilePlan(
+        title=title,
+        points=pts,
+        language=language,
+        paper_format=paper_format,
+        horiz_scale=h_scale,
+        vert_scale=v_scale
+    )
+    png_bytes = service.render_profile(plan)
+    return Image(data=png_bytes, format="png")
 
 @mcp.tool()
 def adjust_network_least_squares(

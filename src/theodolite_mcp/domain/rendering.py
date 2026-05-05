@@ -10,7 +10,7 @@ import matplotlib.patches as patches
 from matplotlib.font_manager import FontProperties
 import textwrap
 
-from .models import PlotPlan, Point, Zone, AsBuiltPoint, VolumeGrid
+from .models import PlotPlan, Point, Zone, AsBuiltPoint, VolumeGrid, ProfilePlan, ProfilePoint
 from .logic import calculate_azimuth_from_points, calculate_area
 
 # --- ISO 128-20:1996 & ISO 128-23:1999 Standards Constants ---
@@ -1136,6 +1136,133 @@ def _draw_volume_grid(ax, grid: VolumeGrid, m_per_pt: float = 0.1):
         working_z = (cell.actual_z - cell.design_z)
         ax.text(cell.center_x + s2*0.8, cell.center_y + s2*0.8, f"{working_z:+.2f}", 
                 fontproperties=_get_font(5.5), color='black', ha='right', va='top')
+
+def _draw_profile_table(fig, plan: ProfilePlan, pw_mm: float, ph_mm: float):
+    """
+    Renders the classic engineering profile table (the 'Podval').
+    Contains: Station, Distances, Ground Levels, Design Levels.
+    """
+    # Dimensions (mm)
+    table_w = pw_mm - MARGIN_LEFT - MARGIN_OTHER - STAMP_WIDTH - 10
+    row_h = 8.0
+    headers_w = 40.0 # Width of the label column
+    
+    rows = [
+        {"id": "design_z", "label": "Проектная отметка"},
+        {"id": "ground_z", "label": "Отметка земли"},
+        {"id": "dist", "label": "Расстояние"},
+        {"id": "station", "label": "Пикет"},
+    ]
+    
+    table_h = len(rows) * row_h
+    left_mm = MARGIN_LEFT
+    bottom_mm = MARGIN_OTHER
+    
+    ax_table = fig.add_axes([left_mm / pw_mm, bottom_mm / ph_mm, table_w / pw_mm, table_h / ph_mm])
+    ax_table.set_xticks([]); ax_table.set_yticks([]); ax_table.set_facecolor('white')
+    for spine in ax_table.spines.values(): spine.set_linewidth(D/MM_TO_PT)
+    
+    # Grid lines
+    for i in range(len(rows) + 1):
+        ax_table.axhline(i / len(rows), color='black', lw=D/MM_TO_PT)
+    ax_table.axvline(headers_w / table_w, color='black', lw=D/MM_TO_PT)
+    
+    # Labels
+    for i, row in enumerate(reversed(rows)):
+        ax_table.text(2/table_w, (i + 0.5) / len(rows), row["label"], 
+                      fontproperties=_get_font(6.5, bold=True), va='center')
+
+    # Data Column Mapping
+    s_min = plan.points[0].station
+    s_max = plan.points[-1].station
+    s_span = s_max - s_min or 1.0
+    
+    data_w = table_w - headers_w
+    def s_to_x(s): return (headers_w + (s - s_min) / s_span * data_w) / table_w
+
+    for i, p in enumerate(plan.points):
+        x = s_to_x(p.station)
+        # Vertical tick
+        ax_table.axvline(x, color='black', lw=D/MM_TO_PT, ymin=0, ymax=1)
+        
+        # Ground Z
+        ax_table.text(x, 1.5/len(rows) + 1/len(rows)*1, f"{p.ground_z:.2f}", 
+                      fontproperties=_get_font(6), rotation=90, ha='center', va='center')
+        
+        # Design Z
+        if p.design_z is not None:
+            ax_table.text(x, 1.5/len(rows) + 1/len(rows)*2, f"{p.design_z:.2f}", 
+                          fontproperties=_get_font(6), rotation=90, ha='center', va='center', color='red')
+        
+        # Station (Picket)
+        ax_table.text(x, 0.5/len(rows), f"{p.station:.0f}", 
+                      fontproperties=_get_font(6), ha='center', va='center')
+
+        # Distance between points
+        if i > 0:
+            prev = plan.points[i-1]
+            dist = p.station - prev.station
+            mx_val = (s_to_x(p.station) + s_to_x(prev.station)) / 2
+            ax_table.text(mx_val, 1.5/len(rows), f"{dist:.1f}", 
+                          fontproperties=_get_font(6), ha='center', va='center')
+
+def render_profile_plan(plan: ProfilePlan) -> bytes:
+    """
+    Generates a professional longitudinal profile with vertical exaggeration.
+    """
+    dpi = plan.dpi
+    lang = plan.language or "ru"
+    
+    # 1. Sheet Setup
+    base_w, base_h = PAPER_SIZES.get(plan.paper_format.upper(), PAPER_SIZES["A3"])
+    pw_mm, ph_mm = (base_w, base_h) if plan.orientation == "landscape" else (base_h, base_w)
+    fig = Figure(figsize=(pw_mm / 25.4, ph_mm / 25.4), dpi=dpi)
+    
+    # Frame & Grid
+    ax_frame = fig.add_axes([0, 0, 1, 1])
+    ax_frame.set_axis_off(); ax_frame.set_xlim(0, pw_mm); ax_frame.set_ylim(0, ph_mm)
+    frame_rect = Rectangle((MARGIN_LEFT, MARGIN_OTHER), pw_mm-MARGIN_LEFT-MARGIN_OTHER, ph_mm-2*MARGIN_OTHER, fill=False, lw=D_WIDE/MM_TO_PT)
+    ax_frame.add_patch(frame_rect)
+    _draw_sheet_reference_grid(ax_frame, pw_mm, ph_mm)
+    
+    # 2. Calculation of Axes
+    table_h_mm = 32.0 # 4 rows * 8mm
+    draw_left = MARGIN_LEFT + 10
+    draw_bottom = MARGIN_OTHER + table_h_mm + 10
+    draw_w = pw_mm - MARGIN_LEFT - MARGIN_OTHER - 20
+    draw_h = ph_mm - MARGIN_OTHER - table_h_mm - STAMP_HEIGHT - 20 
+    
+    ax = fig.add_axes([draw_left/pw_mm, draw_bottom/ph_mm, draw_w/pw_mm, draw_h/ph_mm])
+    
+    stations = [p.station for p in plan.points]
+    grounds = [p.ground_z for p in plan.points]
+    designs = [p.design_z for p in plan.points if p.design_z is not None]
+    all_z = grounds + designs
+    
+    s_min, s_max = min(stations), max(stations)
+    z_min, z_max = min(all_z) - 2, max(all_z) + 5
+    
+    ax.set_xlim(s_min, s_max)
+    ax.set_ylim(z_min, z_max)
+    ax.set_aspect('auto') 
+    
+    # 3. Plotting lines
+    ax.plot(stations, grounds, color='black', lw=D/MM_TO_PT)
+    if designs:
+        d_stations = [p.station for p in plan.points if p.design_z is not None]
+        ax.plot(d_stations, designs, color='red', lw=D_WIDE/MM_TO_PT)
+    
+    ax.grid(True, linestyle=':', alpha=0.4)
+    ax.set_title(plan.title, fontproperties=_get_font(10, bold=True))
+    
+    # 4. Table and Stamp
+    _draw_profile_table(fig, plan, pw_mm, ph_mm)
+    _draw_stamp(fig, plan, f"H 1:{plan.horiz_scale} / V 1:{plan.vert_scale}", pw_mm, ph_mm, lang=lang)
+    
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=dpi, facecolor='white')
+    buf.seek(0)
+    return buf.getvalue()
 
 def render_plot_plan(plan: PlotPlan) -> bytes:
     dpi = plan.dpi if plan.dpi >= 150 else 300

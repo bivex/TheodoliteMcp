@@ -1,7 +1,7 @@
 from typing import List, Dict
 from ..domain.models import TraverseData, TraverseResult, PlotPlan
 from ..domain.logic import calculate_traverse
-from ..domain.rendering import render_plot_plan
+from ..domain.rendering import render_plot_plan, render_profile_plan
 from ..domain.dxf_export import export_plan_to_dxf
 from ..domain.least_squares import ObservationLS, adjust_network_2d, LSAResult
 from ..domain.geodesy import (
@@ -15,6 +15,9 @@ class SurveyService:
 
     def render_plot(self, plan: PlotPlan) -> bytes:
         return render_plot_plan(plan)
+
+    def render_profile(self, plan: ProfilePlan) -> bytes:
+        return render_profile_plan(plan)
 
     def export_dxf(self, plan: PlotPlan, output_path: str) -> str:
         return export_plan_to_dxf(plan, output_path)
