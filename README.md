@@ -45,7 +45,7 @@ PYTHONPATH=src python3 demo_task.py
 ## 🛠 Available Tools
 
 ### 🖋 Rendering & Visualization
-- **`draw_plot_plan`**: The flagship tool. Generates an ISO-compliant technical drawing (PNG) from survey data. Supports standard formats (A0-A4), multiple languages (RU/UK/EN), and professional styles (Construction/Shipbuilding).
+- **`draw_plot_plan`**: The flagship tool. Generates an ISO-compliant technical drawing (PNG) from survey data. Supports standard formats (A0-A4), **13 languages** (EN, RU, UK, DE, FR, ES, IT, PT, PL, TR, ZH, JA, KO), and professional styles (Construction/Shipbuilding).
 
 ### 📐 Survey Computation (Traverse)
 - **`adjust_traverse_network`**: Performs a full Bowditch (Compass Rule) adjustment. Calculates coordinates from angles and distances, handles angular/linear misclosure, and generates a detailed Markdown report. Supports sea-level and grid scale corrections.
