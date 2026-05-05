@@ -3,6 +3,7 @@ from ..domain.models import (
     TraverseData, Point, Observation, StadiaMeasurement,
     TraverseResult, Zone, PlotPlan, EDMParameters,
 )
+from ..domain.least_squares import ObservationLS
 from ..application.services import SurveyService
 from ..domain.logic import (
     dms_to_decimal, decimal_to_dms, normalize_angle,
@@ -185,6 +186,44 @@ def draw_plot_plan(
 
     png_bytes = service.render_plot(plan)
     return Image(data=png_bytes, format="png")
+
+@mcp.tool()
+def adjust_network_least_squares(
+    observations_json: list[dict],
+    initial_coords: dict[str, dict[str, float]]
+) -> dict:
+    """
+    Performs a 2D Least Squares Adjustment on a surveying network.
+    Supports distances and azimuths with precision estimates.
+    """
+    obs = [ObservationLS(**o) for o in observations_json]
+    result = service.adjust_network_least_squares(obs, initial_coords)
+    return result.model_dump()
+
+@mcp.tool()
+def transform_coordinate_system(
+    lat: float, lon: float, h: float,
+    dx: float, dy: float, dz: float,
+    rx: float, ry: float, rz: float,
+    s: float
+) -> dict:
+    """
+    Performs a 7-parameter Helmert transformation from WGS84 to a local system.
+    rx, ry, rz in arc-seconds, s in PPM.
+    """
+    params = {"dx": dx, "dy": dy, "dz": dz, "rx_sec": rx, "ry_sec": ry, "rz_sec": rz, "s_ppm": s}
+    return service.transform_wgs84_to_local(lat, lon, h, params)
+
+@mcp.tool()
+def project_coordinates_gauss_kruger(
+    lat: float, lon: float, 
+    central_meridian: float
+) -> dict:
+    """
+    Projects geodetic coordinates to Gauss-Krüger (X, Y) grid.
+    Uses Krasovsky ellipsoid (standard for S-42/USK-2000).
+    """
+    return service.project_to_grid(lat, lon, 0.0, central_meridian)
 
 if __name__ == "__main__":
     mcp.run()
