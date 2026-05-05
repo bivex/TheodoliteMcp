@@ -2,7 +2,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 class Point(BaseModel):
-    name: str
+    name: str = "P"
     x: Optional[float] = None
     y: Optional[float] = None
     z: Optional[float] = None
