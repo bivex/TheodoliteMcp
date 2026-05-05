@@ -3,22 +3,21 @@ from theodolite_mcp.domain.models import Point, Zone, PlotPlan
 from theodolite_mcp.domain.rendering import render_plot_plan
 
 def test_legend_overflow():
-    print("🧪 Testing Legend Overflow (20 Zones)...")
+    print("🧪 Testing Dynamic Legend Scaling (50 Zones)...")
     
     # 1. Create a large boundary
-    boundary = [Point(x=0, y=0), Point(x=100, y=0), Point(x=100, y=100), Point(x=0, y=100)]
+    boundary = [Point(x=0, y=0), Point(x=200, y=0), Point(x=200, y=200), Point(x=0, y=200)]
     
-    # 2. Generate 20 zones
+    # 2. Generate 50 zones
     zones = []
-    for i in range(20):
-        # Small squares
-        x = (i % 5) * 10 + 5
-        y = (i // 5) * 10 + 5
-        pts = [Point(x=x, y=y), Point(x=x+5, y=y), Point(x=x+5, y=y+5), Point(x=x, y=y+5)]
-        zones.append(Zone(name=f"Test Zone {i+1}", points=pts))
+    for i in range(50):
+        x = (i % 10) * 15 + 5
+        y = (i // 10) * 15 + 5
+        pts = [Point(x=x, y=y), Point(x=x+10, y=y), Point(x=x+10, y=y+10), Point(x=x, y=y+10)]
+        zones.append(Zone(name=f"Unit Room {i+1}", points=pts))
         
     plan = PlotPlan(
-        title="LEGEND OVERFLOW STRESS TEST",
+        title="LEGEND EXTREME SCALING TEST (50 ITEMS)",
         boundary_points=boundary,
         zones=zones,
         language="en",
