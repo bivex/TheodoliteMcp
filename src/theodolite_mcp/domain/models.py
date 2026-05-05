@@ -52,10 +52,13 @@ class ProfilePlan(BaseModel):
 
 class Opening(BaseModel):
     type: str  # "door", "window"
-    start_distance: float  # Along the wall from wall.start
+    start_distance: float = Field(..., alias="position")
     width: float
     height: Optional[float] = 2.1
     direction: int = 1 # 1 or -1 for door opening side
+
+    class Config:
+        populate_by_name = True
 
 class Wall(BaseModel):
     start_pt: Point
