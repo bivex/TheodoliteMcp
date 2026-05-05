@@ -1,11 +1,13 @@
 import io
 import math
+import os
 from typing import List, Optional, Tuple, Dict
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 import matplotlib.patches as patches
+from matplotlib.font_manager import FontProperties
 import textwrap
 
 from .models import PlotPlan, Point, Zone
@@ -32,6 +34,16 @@ MARGIN_OTHER = 10.0
 # ISO 7200:2004 Title Block (Stamp) Constants (mm)
 STAMP_WIDTH = 185.0
 STAMP_HEIGHT = 55.0
+
+# Font handling (ISO 3098)
+FONT_PATH = os.path.join(os.path.dirname(__file__), "osifont.ttf")
+def _get_font(size=7, bold=False, italic=False):
+    if os.path.exists(FONT_PATH):
+        weight = 'bold' if bold else 'normal'
+        style = 'italic' if italic else 'normal'
+        return FontProperties(fname=FONT_PATH, size=size, weight=weight, style=style)
+    # Fallback to standard fonts if ttf is missing
+    return {'fontsize': size, 'fontweight': 'bold' if bold else 'normal', 'style': 'italic' if italic else 'normal'}
 
 D = 0.35 * MM_TO_PT          # Narrow (d)
 D_WIDE = 0.7 * MM_TO_PT      # Wide (2d)
@@ -232,13 +244,13 @@ def _draw_zones(ax, zones: List[Zone], show_areas: bool = False, standard: str =
                          terminator="dot", m_per_pt=m_per_pt, fontsize=8)
         else:
             # Opaque white bbox (alpha=1.0) creates the 'window' in the hatching
-            ax.text(zx, zy, str(i + 1), fontsize=8.5, fontweight='bold', ha='center', va='center', zorder=10,
+            ax.text(zx, zy, str(i + 1), fontproperties=_get_font(8.5, bold=True), ha='center', va='center', zorder=10,
                     bbox=dict(boxstyle='circle,pad=0.2', facecolor='white', edgecolor='black', 
                               linewidth=D_SYMBOL/MM_TO_PT, alpha=1.0))
         
         if show_areas and area >= 0.5:
             # Inscription below the zone number
-            ax.text(zx, zy - 1.2, f"{area:.1f} m²", fontsize=7, ha='center', va='top', zorder=10, 
+            ax.text(zx, zy - 1.2, f"{area:.1f} m²", fontproperties=_get_font(7), ha='center', va='top', zorder=10, 
                     bbox=dict(boxstyle='round,pad=0.15', facecolor='white', edgecolor='none', alpha=1.0))
 
 def _draw_leader(ax, target_x: float, target_y: float, text: str, 
@@ -279,7 +291,7 @@ def _draw_leader(ax, target_x: float, target_y: float, text: str,
     
     # 4. Text - preferably above shelf, gap = 2 * line width
     ax.text(lx + shelf_dir * shelf_len/2, ly + 2*d_m, text, 
-            fontsize=fontsize, ha='center', va='bottom', zorder=10)
+            fontproperties=_get_font(fontsize), ha='center', va='bottom', zorder=10)
 
 def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8, standard: str = "construction", 
                         m_per_pt: float = 0.1, show_coords: bool = False):
@@ -320,7 +332,7 @@ def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8, standard: 
             _draw_leader(ax, p.x, p.y, name, offset_x=vx*3, offset_y=vy*3, 
                          terminator="none", m_per_pt=m_per_pt, fontsize=fontsize-1)
         else:
-            ax.text(pos_x, pos_y, name, fontsize=fontsize, ha='center', va='center', zorder=5,
+            ax.text(pos_x, pos_y, name, fontproperties=_get_font(fontsize), ha='center', va='center', zorder=5,
                     bbox=dict(facecolor='white', edgecolor='none', alpha=0.8, pad=0.05))
             used_positions.append((pos_x, pos_y))
 
@@ -401,7 +413,7 @@ def _draw_distances(ax, points: List[Point], standard: str = "construction", fon
         
         if text_fits:
             ax.text(mx + ox_line + tx_off, my + oy_line + ty_off, f'{dist:.2f}', 
-                    fontsize=fontsize, ha='center', va='bottom', rotation=angle_deg, zorder=10, style='italic',
+                    fontproperties=_get_font(fontsize, italic=True), ha='center', va='bottom', rotation=angle_deg, zorder=10,
                     bbox=dict(facecolor='white', edgecolor='none', alpha=1.0, pad=0.1))
         else:
             # ISO 129-1: Small gap - move text outside or use leader
@@ -414,7 +426,7 @@ def _draw_distances(ax, points: List[Point], standard: str = "construction", fon
         if show_azimuths:
             az = calculate_azimuth_from_points(p1, p2)
             ax.text(mx + ox_line - tx_off, my + oy_line - ty_off, f'{az:.1f}°', 
-                    fontsize=fontsize-1.5, ha='center', va='top', rotation=angle_deg, zorder=10)
+                    fontproperties=_get_font(fontsize-1.5), ha='center', va='top', rotation=angle_deg, zorder=10)
 
 def _draw_scale_bar(ax, x_span: float, width_inches: float, lang: str = "ru"):
     texts = I18N.get(lang, I18N["ru"])
@@ -435,7 +447,7 @@ def _draw_scale_bar(ax, x_span: float, width_inches: float, lang: str = "ru"):
     ax.plot([x_pos + sb_len_m, x_pos + sb_len_m], [y_pos, y_pos + (ylim[1]-ylim[0])*0.015], color='black', linewidth=D_WIDE, zorder=10)
     
     ax.text(x_pos + sb_len_m/2, y_pos - (ylim[1]-ylim[0])*0.02, f"{int(sb_len_m)}{texts['unit_m']}", 
-            fontsize=7, ha='center', va='top', fontweight='bold')
+            fontproperties=_get_font(7, bold=True), ha='center', va='top')
 
 def _calculate_auto_scale(x_span: float, available_width_mm: float) -> int:
     """ISO 5455:1981 - Strict standard scales."""
@@ -471,34 +483,31 @@ def _draw_stamp(fig, plan: PlotPlan, scale_str: str, pw_mm: float, ph_mm: float,
     ax_stamp.axhline(0.6, color='black', lw=D/MM_TO_PT)
     ax_stamp.axvline(0.2, color='black', lw=D/MM_TO_PT)
     
-    font_p = {'fontsize': 6.5, 'family': 'sans-serif', 'style': 'italic'}
-    font_b = {'fontsize': 7.5, 'fontweight': 'bold'}
-    
     # Row 1: Project Number
-    ax_stamp.text(0.02, 0.9, texts["project_no"], **font_p, va='center')
-    ax_stamp.text(0.22, 0.9, plan.project_number, **font_b, va='center')
+    ax_stamp.text(0.02, 0.9, texts["project_no"], fontproperties=_get_font(6.5, italic=True), va='center')
+    ax_stamp.text(0.22, 0.9, plan.project_number, fontproperties=_get_font(7.5, bold=True), va='center')
     
     # Row 2: Organization
-    ax_stamp.text(0.02, 0.7, texts["org"], **font_p, va='center')
-    ax_stamp.text(0.22, 0.7, plan.organization, **font_b, va='center')
+    ax_stamp.text(0.02, 0.7, texts["org"], fontproperties=_get_font(6.5, italic=True), va='center')
+    ax_stamp.text(0.22, 0.7, plan.organization, fontproperties=_get_font(7.5, bold=True), va='center')
     
     # Row 3: Title (Project)
-    ax_stamp.text(0.02, 0.5, texts["project"], **font_p, va='center')
+    ax_stamp.text(0.02, 0.5, texts["project"], fontproperties=_get_font(6.5, italic=True), va='center')
     wrapped_title = '\n'.join(textwrap.wrap(plan.title, width=45))
-    ax_stamp.text(0.22, 0.5, wrapped_title, **font_b, va='center')
+    ax_stamp.text(0.22, 0.5, wrapped_title, fontproperties=_get_font(7.5, bold=True), va='center')
     
     # Row 4: Date, Stage, Scale
-    ax_stamp.text(0.02, 0.3, texts["date"], **font_p, va='center')
-    ax_stamp.text(0.22, 0.3, plan.date, fontsize=6.5, va='center')
+    ax_stamp.text(0.02, 0.3, texts["date"], fontproperties=_get_font(6.5, italic=True), va='center')
+    ax_stamp.text(0.22, 0.3, plan.date, fontproperties=_get_font(6.5), va='center')
     
     # Scale box
     ax_stamp.axvline(0.5, ymin=0, ymax=0.4, color='black', lw=D/MM_TO_PT)
-    ax_stamp.text(0.52, 0.3, texts["scale"], **font_p, va='center')
-    ax_stamp.text(0.75, 0.3, scale_str, **font_b, va='center')
+    ax_stamp.text(0.52, 0.3, texts["scale"], fontproperties=_get_font(6.5, italic=True), va='center')
+    ax_stamp.text(0.75, 0.3, scale_str, fontproperties=_get_font(7.5, bold=True), va='center')
     
     # Row 5: Drawing Name
-    ax_stamp.text(0.02, 0.1, texts["draft"], **font_p, va='center')
-    ax_stamp.text(0.22, 0.1, plan.title, **font_b, va='center')
+    ax_stamp.text(0.02, 0.1, texts["draft"], fontproperties=_get_font(6.5, italic=True), va='center')
+    ax_stamp.text(0.22, 0.1, plan.title, fontproperties=_get_font(7.5, bold=True), va='center')
 
 def _draw_explication(fig, zones: List[Zone], total_area: float, pw_mm: float, ph_mm: float, lang: str = "ru"):
     texts = I18N.get(lang, I18N["ru"])
@@ -511,27 +520,26 @@ def _draw_explication(fig, zones: List[Zone], total_area: float, pw_mm: float, p
     ax_leg = fig.add_axes([left_mm / pw_mm, bottom_mm / ph_mm, width_mm / pw_mm, height_mm / ph_mm])
     ax_leg.set_axis_off()
     
-    font_props = {'family': 'sans-serif', 'style': 'italic'}
     y_pos = 0.95
-    ax_leg.text(0, y_pos, texts["explication"], fontsize=8, fontweight='bold', **font_props)
+    ax_leg.text(0, y_pos, texts["explication"], fontproperties=_get_font(8, bold=True, italic=True))
     y_pos -= 0.12
-    ax_leg.text(0, y_pos, f"{texts['total_area']} {total_area:.1f} м²", fontsize=7, fontweight='bold', **font_props)
+    ax_leg.text(0, y_pos, f"{texts['total_area']} {total_area:.1f} м²", fontproperties=_get_font(7, bold=True, italic=True))
     y_pos -= 0.12
     
     # Headers
-    ax_leg.text(0, y_pos, texts["num"], fontsize=6.5, fontweight='bold', **font_props)
-    ax_leg.text(0.12, y_pos, texts["name"], fontsize=6.5, fontweight='bold', **font_props)
-    ax_leg.text(0.8, y_pos, texts["area_sqm"], fontsize=6.5, fontweight='bold', **font_props)
+    ax_leg.text(0, y_pos, texts["num"], fontproperties=_get_font(6.5, bold=True, italic=True))
+    ax_leg.text(0.12, y_pos, texts["name"], fontproperties=_get_font(6.5, bold=True, italic=True))
+    ax_leg.text(0.8, y_pos, texts["area_sqm"], fontproperties=_get_font(6.5, bold=True, italic=True))
     y_pos -= 0.1
     
     for i, zone in enumerate(zones):
         if y_pos < 0.05:
-            ax_leg.text(0, y_pos, texts["others"], fontsize=6, fontstyle='italic')
+            ax_leg.text(0, y_pos, texts["others"], fontproperties=_get_font(6, italic=True))
             break
         area = calculate_area(zone.points) or 0
-        ax_leg.text(0, y_pos, str(i + 1), fontsize=6.5, **font_props)
-        ax_leg.text(0.12, y_pos, zone.name[:18], fontsize=6.5, **font_props)
-        ax_leg.text(0.8, y_pos, f'{area:.1f}', fontsize=6.5, **font_props)
+        ax_leg.text(0, y_pos, str(i + 1), fontproperties=_get_font(6.5, italic=True))
+        ax_leg.text(0.12, y_pos, zone.name[:18], fontproperties=_get_font(6.5, italic=True))
+        ax_leg.text(0.8, y_pos, f'{area:.1f}', fontproperties=_get_font(6.5, italic=True))
         y_pos -= 0.08
 
 def _draw_north_arrow(ax, lang: str = "ru"):
@@ -541,7 +549,7 @@ def _draw_north_arrow(ax, lang: str = "ru"):
     x, y = xlim[0] + (xlim[1] - xlim[0]) * 0.08, ylim[1] - (ylim[1] - ylim[0]) * 0.1
     arrow_len = (ylim[1] - ylim[0]) * 0.06
     ax.annotate('', xy=(x, y + arrow_len), xytext=(x, y), arrowprops=dict(arrowstyle='fancy', color='black', linewidth=D_SYMBOL))
-    ax.text(x, y + arrow_len + arrow_len*0.3, texts["north"], fontsize=9, fontweight='bold', ha='center')
+    ax.text(x, y + arrow_len + arrow_len*0.3, texts["north"], fontproperties=_get_font(9, bold=True), ha='center')
 
 def render_plot_plan(plan: PlotPlan) -> bytes:
     dpi = plan.dpi if plan.dpi >= 150 else 300
@@ -606,7 +614,8 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     
     ax.grid(True, which='both', color='#F8F8F8', linestyle=TYPE_01, linewidth=D, zorder=0)
     ax.tick_params(labelsize=6.5)
-    ax.set_xlabel("X (m)", fontsize=6.5, style='italic'); ax.set_ylabel("Y (m)", fontsize=6.5, style='italic')
+    ax.set_xlabel("X (m)", fontproperties=_get_font(6.5, italic=True))
+    ax.set_ylabel("Y (m)", fontproperties=_get_font(6.5, italic=True))
     
     if plan.zones: _draw_zones(ax, plan.zones, show_areas=plan.show_areas, standard=plan.standard, m_per_pt=m_per_pt)
     _draw_boundary(ax, plan.boundary_points, standard=plan.standard)
@@ -623,8 +632,8 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
         
     if plan.standard == "shipbuilding":
         texts = I18N.get(lang, I18N["ru"])
-        ax.text(ax.get_xlim()[0], cy, texts.get("stern", "STERN"), fontsize=8, fontweight='bold', ha='left', va='center', rotation=90)
-        ax.text(ax.get_xlim()[1], cy, texts.get("bow", "BOW"), fontsize=8, fontweight='bold', ha='right', va='center', rotation=-90)
+        ax.text(ax.get_xlim()[0], cy, texts.get("stern", "STERN"), fontproperties=_get_font(8, bold=True), ha='left', va='center', rotation=90)
+        ax.text(ax.get_xlim()[1], cy, texts.get("bow", "BOW"), fontproperties=_get_font(8, bold=True), ha='right', va='center', rotation=-90)
     else:
         _draw_north_arrow(ax, lang=lang)
     
