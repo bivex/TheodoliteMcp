@@ -61,6 +61,9 @@ class Zone(BaseModel):
 
 class PlotPlan(BaseModel):
     title: str = "Cadastral Plan"
+    project_number: str = "P-001"
+    organization: str = "Engineering Bureau"
+    date: str = "2026-05-05"
     boundary_points: List[Point]
     zones: List[Zone] = []
     language: str = "ru"  # "ru", "uk", "en"

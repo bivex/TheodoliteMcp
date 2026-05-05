@@ -40,6 +40,9 @@ TYPE_RAILWAY = (0, (DS, DT, DS, DT))
 I18N: Dict[str, Dict[str, str]] = {
     "ru": {
         "project": "Проект:",
+        "project_no": "№ Проекта:",
+        "org": "Орг.:",
+        "date": "Дата:",
         "stage": "Стадия:",
         "scale": "Масштаб:",
         "draft": "Чертеж (П)",
@@ -51,10 +54,15 @@ I18N: Dict[str, Dict[str, str]] = {
         "area_sqm": "S, м²",
         "north": "С",
         "others": "... и другие",
-        "unit_m": "м"
+        "unit_m": "м",
+        "bow": "НОС",
+        "stern": "КОРМА"
     },
     "uk": {
         "project": "Проєкт:",
+        "project_no": "№ Проєкту:",
+        "org": "Орг.:",
+        "date": "Дата:",
         "stage": "Стадія:",
         "scale": "Масштаб:",
         "draft": "Креслення (П)",
@@ -66,10 +74,15 @@ I18N: Dict[str, Dict[str, str]] = {
         "area_sqm": "S, м²",
         "north": "Пн",
         "others": "... та інші",
-        "unit_m": "м"
+        "unit_m": "м",
+        "bow": "НІС",
+        "stern": "КОРМА"
     },
     "en": {
         "project": "Project:",
+        "project_no": "Proj No:",
+        "org": "Org:",
+        "date": "Date:",
         "stage": "Stage:",
         "scale": "Scale:",
         "draft": "Draft (P)",
@@ -147,7 +160,7 @@ def _draw_boundary(ax, points: List[Point], color: str = 'black', standard: str 
     xs, ys = _polygon_coords(points)
     ax.plot(xs, ys, color=color, linewidth=lw, linestyle=ls, zorder=3)
 
-def _draw_zones(ax, zones: List[Zone], show_areas: bool = False, standard: str = "construction"):
+def _draw_zones(ax, zones: List[Zone], show_areas: bool = False, standard: str = "construction", m_per_pt: float = 0.1):
     for i, zone in enumerate(zones):
         color = zone.fill_color or _auto_color(i)
         hatch = _get_hatch(zone.name)
@@ -194,15 +207,22 @@ def _draw_zones(ax, zones: List[Zone], show_areas: bool = False, standard: str =
         
         # 3. Inscriptions & Labels (ISO 128-50: Interruption of hatching)
         zx, zy = _centroid(zone.points)
-        # Opaque white bbox (alpha=1.0) creates the 'window' in the hatching
-        ax.text(zx, zy, str(i + 1), fontsize=8.5, fontweight='bold', ha='center', va='center', zorder=10,
-                bbox=dict(boxstyle='circle,pad=0.2', facecolor='white', edgecolor='black', 
-                          linewidth=D_SYMBOL/MM_TO_PT, alpha=1.0))
         
-        if show_areas:
+        # Determine if we should use a leader for the zone number
+        # If it's a line (area < 0.1) or shipbuilding (more crowded), use leader
+        if area < 0.5 or standard == "shipbuilding":
+            _draw_leader(ax, zx, zy, str(i + 1), offset_x=4, offset_y=4, 
+                         terminator="dot", m_per_pt=m_per_pt, fontsize=8)
+        else:
+            # Opaque white bbox (alpha=1.0) creates the 'window' in the hatching
+            ax.text(zx, zy, str(i + 1), fontsize=8.5, fontweight='bold', ha='center', va='center', zorder=10,
+                    bbox=dict(boxstyle='circle,pad=0.2', facecolor='white', edgecolor='black', 
+                              linewidth=D_SYMBOL/MM_TO_PT, alpha=1.0))
+        
+        if show_areas and area >= 0.5:
             # Inscription below the zone number
             ax.text(zx, zy - 1.2, f"{area:.1f} m²", fontsize=7, ha='center', va='top', zorder=10, 
-                    bbox=dict(boxstyle='round,pad=0.1', facecolor='white', edgecolor='none', alpha=1.0))
+                    bbox=dict(boxstyle='round,pad=0.15', facecolor='white', edgecolor='none', alpha=1.0))
 
 def _draw_leader(ax, target_x: float, target_y: float, text: str, 
                  offset_x: float = 5.0, offset_y: float = 5.0, 
@@ -244,17 +264,44 @@ def _draw_leader(ax, target_x: float, target_y: float, text: str,
     ax.text(lx + shelf_dir * shelf_len/2, ly + 2*d_m, text, 
             fontsize=fontsize, ha='center', va='bottom', zorder=10)
 
-def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8, standard: str = "construction"):
+def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8, standard: str = "construction", m_per_pt: float = 0.1):
     cx, cy = _centroid(points)
-    for p in points:
+    used_positions = []
+    used_points = []
+    
+    for i, p in enumerate(points):
+        # Skip if we already labeled this coordinate (e.g. closed loop closing point)
+        if any(math.hypot(p.x - ox, p.y - oy) < 0.001 for ox, oy in used_points):
+            continue
+        used_points.append((p.x, p.y))
+
         name = p.name
         if standard == "shipbuilding" and name.isdigit():
             name = f"FR{name}"
             
         dx, dy = p.x - cx, p.y - cy
         dist = math.hypot(dx, dy)
-        offset_x, offset_y = (dx / dist * 1.6, dy / dist * 1.6) if dist > 0 else (1.6, 1.6)
-        ax.text(p.x + offset_x, p.y + offset_y, name, fontsize=fontsize, ha='center', va='center', zorder=5)
+        
+        # Default offset
+        off_val = 2.0
+        vx, vy = (dx / dist * off_val, dy / dist * off_val) if dist > 0 else (off_val, off_val)
+        
+        # Check if this position is too close to any previously used position
+        pos_x, pos_y = p.x + vx, p.y + vy
+        collision = False
+        for ux, uy in used_positions:
+            if math.hypot(pos_x - ux, pos_y - uy) < 4.0 * MM_TO_PT * m_per_pt:
+                collision = True
+                break
+        
+        if collision:
+            # Shift further and use a leader
+            _draw_leader(ax, p.x, p.y, name, offset_x=vx*3, offset_y=vy*3, 
+                         terminator="none", m_per_pt=m_per_pt, fontsize=fontsize-1)
+        else:
+            ax.text(pos_x, pos_y, name, fontsize=fontsize, ha='center', va='center', zorder=5,
+                    bbox=dict(facecolor='white', edgecolor='none', alpha=0.8, pad=0.05))
+            used_positions.append((pos_x, pos_y))
 
 def _draw_distances(ax, points: List[Point], standard: str = "construction", fontsize: float = 7, show_azimuths: bool = False, m_per_pt: float = 0.1):
     # Calculate centroid to determine 'inside' direction
@@ -328,7 +375,7 @@ def _draw_distances(ax, points: List[Point], standard: str = "construction", fon
         # Distance (always on top relative to line direction)
         ax.text(mx + ox_line + tx_off, my + oy_line + ty_off, f'{dist:.2f}', 
                 fontsize=fontsize, ha='center', va='bottom', rotation=angle_deg, zorder=10, style='italic',
-                bbox=dict(facecolor='white', edgecolor='none', alpha=0.7, pad=0.1))
+                bbox=dict(facecolor='white', edgecolor='none', alpha=1.0, pad=0.2))
         
         # Azimuth (below line)
         if show_azimuths:
@@ -365,28 +412,42 @@ def _calculate_auto_scale(x_span: float, width_inches: float) -> str:
         if s >= raw_scale: return f'1:{s}'
     return f'1:{int(raw_scale)}'
 
-def _draw_stamp(fig, title: str, scale_str: str, lang: str = "ru"):
+def _draw_stamp(fig, plan: PlotPlan, scale_str: str, lang: str = "ru"):
     texts = I18N.get(lang, I18N["ru"])
-    # Stamp frame (Wide line 01.2)
-    ax_stamp = fig.add_axes([0.65, 0.05, 0.3, 0.15])
+    # ISO 7200 inspired title block
+    ax_stamp = fig.add_axes([0.6, 0.05, 0.35, 0.2])
     ax_stamp.set_xticks([]); ax_stamp.set_yticks([]); ax_stamp.set_facecolor('white')
     for spine in ax_stamp.spines.values(): spine.set_linewidth(D_WIDE/MM_TO_PT)
     
-    # Internal grid (Narrow line 01.1)
-    ax_stamp.axhline(0.33, color='black', lw=D/MM_TO_PT)
-    ax_stamp.axhline(0.66, color='black', lw=D/MM_TO_PT)
+    # Internal grid
+    ax_stamp.axhline(0.25, color='black', lw=D/MM_TO_PT)
+    ax_stamp.axhline(0.5, color='black', lw=D/MM_TO_PT)
+    ax_stamp.axhline(0.75, color='black', lw=D/MM_TO_PT)
     ax_stamp.axvline(0.3, color='black', lw=D/MM_TO_PT)
     
-    import textwrap
-    wrapped_title = '\n'.join(textwrap.wrap(title, width=22))
-    font_props = {'fontsize': 7.5, 'family': 'sans-serif', 'style': 'italic'}
+    font_p = {'fontsize': 7.5, 'family': 'sans-serif', 'style': 'italic'}
+    font_b = {'fontsize': 8, 'fontweight': 'bold'}
     
-    ax_stamp.text(0.05, 0.8, texts["project"], **font_props, va='center')
-    ax_stamp.text(0.35, 0.8, wrapped_title, fontsize=8, fontweight='bold', va='center')
-    ax_stamp.text(0.05, 0.5, texts["stage"], **font_props, va="center")
-    ax_stamp.text(0.35, 0.5, texts["draft"], fontsize=8, va='center')
-    ax_stamp.text(0.05, 0.15, texts["scale"], **font_props, va='center')
-    ax_stamp.text(0.35, 0.15, scale_str, fontsize=8, va='center')
+    # Row 1: Project Number
+    ax_stamp.text(0.05, 0.875, texts["project_no"], **font_p, va='center')
+    ax_stamp.text(0.35, 0.875, plan.project_number, **font_b, va='center')
+    
+    # Row 2: Organization
+    ax_stamp.text(0.05, 0.625, texts["org"], **font_p, va='center')
+    ax_stamp.text(0.35, 0.625, plan.organization, **font_b, va='center')
+    
+    # Row 3: Title (Project)
+    ax_stamp.text(0.05, 0.375, texts["project"], **font_p, va='center')
+    wrapped_title = '\n'.join(textwrap.wrap(plan.title, width=30))
+    ax_stamp.text(0.35, 0.375, wrapped_title, **font_b, va='center')
+    
+    # Row 4: Date, Stage, Scale
+    ax_stamp.text(0.05, 0.125, texts["date"], **font_p, va='center')
+    ax_stamp.text(0.35, 0.125, plan.date, fontsize=7, va='center')
+    
+    ax_stamp.axvline(0.55, ymin=0, ymax=0.25, color='black', lw=D/MM_TO_PT)
+    ax_stamp.text(0.57, 0.125, texts["scale"], **font_p, va='center')
+    ax_stamp.text(0.75, 0.125, scale_str, **font_b, va='center')
 
 def _draw_explication(fig, zones: List[Zone], total_area: float, lang: str = "ru"):
     texts = I18N.get(lang, I18N["ru"])
@@ -451,10 +512,10 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     ax_width_pt = plan.width_inches * 0.8 * 72
     m_per_pt = (x_max - x_min + x_span*0.56) / ax_width_pt if ax_width_pt > 0 else 0.1
     
-    if plan.zones: _draw_zones(ax, plan.zones, show_areas=plan.show_areas, standard=plan.standard)
+    if plan.zones: _draw_zones(ax, plan.zones, show_areas=plan.show_areas, standard=plan.standard, m_per_pt=m_per_pt)
     _draw_boundary(ax, plan.boundary_points, standard=plan.standard)
     
-    if plan.show_vertex_labels: _draw_vertex_labels(ax, plan.boundary_points, standard=plan.standard)
+    if plan.show_vertex_labels: _draw_vertex_labels(ax, plan.boundary_points, standard=plan.standard, m_per_pt=m_per_pt)
     if plan.show_distances: 
         _draw_distances(ax, plan.boundary_points, standard=plan.standard, fontsize=7.5, 
                         show_azimuths=plan.show_azimuths, m_per_pt=m_per_pt)
@@ -465,16 +526,16 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     if plan.standard == "shipbuilding":
         # ISO 128-15: STERN left, BOW right
         texts = I18N.get(lang, I18N["ru"])
-        ax.text(x_min - x_span*0.1, (y_min+y_max)/2, texts.get("stern", "STERN"), 
+        ax.text(x_min - x_span*0.18, (y_min+y_max)/2, texts.get("stern", "STERN"), 
                 fontsize=9, fontweight='bold', ha='right', va='center', rotation=90)
-        ax.text(x_max + x_span*0.1, (y_min+y_max)/2, texts.get("bow", "BOW"), 
+        ax.text(x_max + x_span*0.18, (y_min+y_max)/2, texts.get("bow", "BOW"), 
                 fontsize=9, fontweight='bold', ha='left', va='center', rotation=-90)
     else:
         _draw_north_arrow(ax, lang=lang)
     
     total_area = calculate_area(plan.boundary_points) or 0
     _draw_explication(fig, plan.zones, total_area, lang=lang)
-    _draw_stamp(fig, plan.title, scale_str, lang=lang)
+    _draw_stamp(fig, plan, scale_str, lang=lang)
     
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=dpi, facecolor='white')
