@@ -19,6 +19,9 @@ class SurveyService:
     def render_profile(self, plan: ProfilePlan) -> bytes:
         return render_profile_plan(plan)
 
+    def render_interior(self, plan: InteriorPlan) -> bytes:
+        return render_interior_plan(plan)
+
     def export_dxf(self, plan: PlotPlan, output_path: str) -> str:
         return export_plan_to_dxf(plan, output_path)
 

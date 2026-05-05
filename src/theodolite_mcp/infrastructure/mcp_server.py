@@ -2,7 +2,9 @@ from mcp.server.fastmcp import FastMCP, Image
 from ..domain.models import (
     TraverseData, Point, Observation, StadiaMeasurement,
     TraverseResult, Zone, PlotPlan, EDMParameters,
-    ProfilePlan, ProfilePoint
+    ProfilePlan, ProfilePoint,
+    InteriorPlan, Wall, Opening, Room,
+    AsBuiltPoint, VolumeGrid, GridCell
 )
 from ..domain.least_squares import ObservationLS
 from ..application.services import SurveyService
@@ -276,6 +278,88 @@ def export_profile_to_dxf(
     
     path = service.export_profile_dxf(plan, full_path)
     return f"✅ Profile DXF successfully exported to: {os.path.abspath(path)}"
+
+@mcp.tool()
+def draw_interior_plan(
+    title: str = "Floor Plan",
+    walls_json: list[dict] = [],
+    rooms_json: list[dict] = [],
+    language: str = "ru",
+    paper_format: str = "A4",
+    scale: int = 50,
+) -> Image:
+    """
+    Generates a professional architectural floor plan (PNG).
+    Supports walls with thickness, door/window openings, and room labels.
+    """
+    walls = []
+    for w in walls_json:
+        openings = [Opening(**op) for op in w.get("openings", [])]
+        walls.append(Wall(
+            start_pt=Point(**w["start_pt"]),
+            end_pt=Point(**w["end_pt"]),
+            thickness=w.get("thickness", 0.3),
+            material=w.get("material", "brick"),
+            status=w.get("status", "existing"),
+            openings=openings
+        ))
+    
+    rooms = []
+    for r in rooms_json:
+        pts = [Point(**p) for p in r.get("points", [])]
+        rooms.append(Room(
+            name=r.get("name", "Room"),
+            number=r.get("number", "1"),
+            points=pts
+        ))
+        
+    plan = InteriorPlan(
+        title=title,
+        walls=walls,
+        rooms=rooms,
+        language=language,
+        paper_format=paper_format,
+        scale=scale
+    )
+    png_bytes = service.render_interior(plan)
+    return Image(data=png_bytes, format="png")
+
+@mcp.tool()
+def draw_construction_as_built_report(
+    title: str = "As-Built Survey Report",
+    as_built_points_json: list[dict] = [],
+    volume_grid_json: dict = None,
+    language: str = "ru",
+    paper_format: str = "A3",
+) -> Image:
+    """
+    Generates a construction report showing deviations (plan/fact) and earthwork volumes.
+    Returns a PNG image with deviation arrows and/or a volume cartogram.
+    """
+    pts = [AsBuiltPoint(**p) for p in as_built_points_json]
+    
+    v_grid = None
+    if volume_grid_json:
+        cells = [GridCell(**c) for c in volume_grid_json.get("cells", [])]
+        v_grid = VolumeGrid(
+            title=volume_grid_json.get("title", "Volume Grid"),
+            cells=cells,
+            total_cut=volume_grid_json.get("total_cut", 0),
+            total_fill=volume_grid_json.get("total_fill", 0),
+            net_volume=volume_grid_json.get("net_volume", 0)
+        )
+        
+    plan = PlotPlan(
+        title=title,
+        boundary_points=[], # Usually optional for deviation reports
+        as_built_points=pts,
+        volume_grid=v_grid,
+        language=language,
+        paper_format=paper_format
+    )
+    
+    png_bytes = service.render_plot(plan)
+    return Image(data=png_bytes, format="png")
 
 @mcp.tool()
 def adjust_network_least_squares(
