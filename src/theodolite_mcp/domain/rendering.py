@@ -10,7 +10,7 @@ import matplotlib.patches as patches
 from matplotlib.font_manager import FontProperties
 import textwrap
 
-from .models import PlotPlan, Point, Zone
+from .models import PlotPlan, Point, Zone, AsBuiltPoint, VolumeGrid
 from .logic import calculate_azimuth_from_points, calculate_area
 
 # --- ISO 128-20:1996 & ISO 128-23:1999 Standards Constants ---
@@ -1080,6 +1080,63 @@ def _draw_sheet_reference_grid(ax_frame, pw_mm: float, ph_mm: float):
             ax_frame.plot([0, MARGIN_LEFT], [ty, ty], color='black', lw=D/MM_TO_PT)
             ax_frame.plot([pw_mm, pw_mm - MARGIN_OTHER], [ty, ty], color='black', lw=D/MM_TO_PT)
 
+def _draw_as_built_deviations(ax, points: List[AsBuiltPoint], m_per_pt: float = 0.1):
+    """
+    Renders standard as-built deviations (arrows and plan/fact text).
+    """
+    for p in points:
+        dx_mm = (p.actual_x - p.design_x) * 1000
+        dy_mm = (p.actual_y - p.design_y) * 1000
+        
+        # Draw design point (cross/circle)
+        ax.plot(p.design_x, p.design_y, 'rx', markersize=4, markeredgewidth=1)
+        # Draw actual point
+        ax.plot(p.actual_x, p.actual_y, 'ko', markersize=2)
+        
+        # Vector arrow (exaggerated for visibility if small, but let's draw real direction)
+        # In construction schemes, we often use text offsets like: ← 12
+        if abs(dx_mm) > 1 or abs(dy_mm) > 1:
+            # Horizontal deviation text
+            h_char = "→" if dx_mm > 0 else "←"
+            ax.text(p.actual_x, p.actual_y + 0.8 * m_per_pt * MM_TO_PT, f"{h_char} {abs(dx_mm):.0f}", 
+                    fontproperties=_get_font(6, bold=True), color='red', ha='center')
+            
+            # Vertical deviation text
+            v_char = "↑" if dy_mm > 0 else "↓"
+            ax.text(p.actual_x + 1.2 * m_per_pt * MM_TO_PT, p.actual_y, f"{v_char} {abs(dy_mm):.0f}", 
+                    fontproperties=_get_font(6, bold=True), color='red', va='center')
+            
+        # Z deviation if exists
+        if p.actual_z is not None and p.design_z is not None:
+            dz_mm = (p.actual_z - p.design_z) * 1000
+            color = 'red' if abs(dz_mm) > 10 else 'blue' # Highlight large Z errors
+            ax.text(p.actual_x, p.actual_y - 0.8 * m_per_pt * MM_TO_PT, f"ΔZ: {dz_mm:+.0f}mm", 
+                    fontproperties=_get_font(5.5), color=color, ha='center', va='top')
+
+def _draw_volume_grid(ax, grid: VolumeGrid, m_per_pt: float = 0.1):
+    """
+    Renders an earthwork cartogram grid with working elevations and volumes.
+    """
+    for cell in grid.cells:
+        s2 = cell.size_m / 2
+        # Draw cell boundary
+        rect = Rectangle((cell.center_x - s2, cell.center_y - s2), 
+                           cell.size_m, cell.size_m, 
+                           fill=True, facecolor='blue' if cell.volume > 0 else 'red', alpha=0.05,
+                           edgecolor='black', linewidth=D/MM_TO_PT, linestyle=':')
+        ax.add_patch(rect)
+        
+        # Center: Volume
+        color = 'blue' if cell.volume > 0 else 'red'
+        ax.text(cell.center_x, cell.center_y, f"{abs(cell.volume):.1f}", 
+                fontproperties=_get_font(7, bold=True), color=color, ha='center', va='center')
+        
+        # Corners/Labels logic (Simplified for demo)
+        # Working elevation (actual_z - design_z)
+        working_z = (cell.actual_z - cell.design_z)
+        ax.text(cell.center_x + s2*0.8, cell.center_y + s2*0.8, f"{working_z:+.2f}", 
+                fontproperties=_get_font(5.5), color='black', ha='right', va='top')
+
 def render_plot_plan(plan: PlotPlan) -> bytes:
     dpi = plan.dpi if plan.dpi >= 150 else 300
     lang = plan.language or "ru"
@@ -1159,6 +1216,12 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
         _draw_distances(ax, plan.boundary_points, standard=plan.standard, fontsize=7, 
                         show_azimuths=plan.show_azimuths, m_per_pt=m_per_pt)
     
+    if plan.as_built_points:
+        _draw_as_built_deviations(ax, plan.as_built_points, m_per_pt=m_per_pt)
+        
+    if plan.volume_grid:
+        _draw_volume_grid(ax, plan.volume_grid, m_per_pt=m_per_pt)
+
     if plan.show_scale_bar:
         _draw_scale_bar(ax, x_span, pw_mm / 25.4, lang=lang)
         

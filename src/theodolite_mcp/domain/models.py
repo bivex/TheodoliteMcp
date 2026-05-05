@@ -7,6 +7,30 @@ class Point(BaseModel):
     y: Optional[float] = None
     z: Optional[float] = None
 
+class AsBuiltPoint(BaseModel):
+    name: str
+    design_x: float
+    design_y: float
+    actual_x: float
+    actual_y: float
+    design_z: Optional[float] = None
+    actual_z: Optional[float] = None
+
+class GridCell(BaseModel):
+    center_x: float
+    center_y: float
+    size_m: float
+    design_z: float
+    actual_z: float
+    volume: float # Positive for fill, negative for cut
+
+class VolumeGrid(BaseModel):
+    title: str = "Earthwork Cartogram"
+    cells: List[GridCell]
+    total_cut: float
+    total_fill: float
+    net_volume: float
+
 class StadiaMeasurement(BaseModel):
     top_hair: float
     bottom_hair: float
@@ -77,6 +101,8 @@ class PlotPlan(BaseModel):
     show_north_arrow: bool = True
     show_scale_bar: bool = True
     coordinate_labels: bool = False
+    as_built_points: List[AsBuiltPoint] = []
+    volume_grid: Optional[VolumeGrid] = None
     width_inches: float = 11.69 # Default A4 Landscape width
     height_inches: float = 8.27  # Default A4 Landscape height
     dpi: int = 300
