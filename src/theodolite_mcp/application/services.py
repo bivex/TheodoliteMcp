@@ -1,8 +1,8 @@
 from typing import List, Dict
-from ..domain.models import TraverseData, TraverseResult, PlotPlan
+from ..domain.models import TraverseData, TraverseResult, PlotPlan, ProfilePlan, InteriorPlan
 from ..domain.logic import calculate_traverse
-from ..domain.rendering import render_plot_plan, render_profile_plan
-from ..domain.dxf_export import export_plan_to_dxf
+from ..domain.rendering import render_plot_plan, render_profile_plan, render_interior_plan
+from ..domain.dxf_export import export_plan_to_dxf, export_profile_to_dxf
 from ..domain.least_squares import ObservationLS, adjust_network_2d, LSAResult
 from ..domain.geodesy import (
     WGS84, KRASOVSKY, helmert_transform, 
