@@ -50,6 +50,40 @@ class ProfilePlan(BaseModel):
     vert_scale: int = 100 # Default 10x exaggeration
     dpi: int = 300
 
+class Opening(BaseModel):
+    type: str  # "door", "window"
+    start_distance: float  # Along the wall from wall.start
+    width: float
+    height: Optional[float] = 2.1
+    direction: int = 1 # 1 or -1 for door opening side
+
+class Wall(BaseModel):
+    start_pt: Point
+    end_pt: Point
+    thickness: float = 0.3 # 300mm default
+    material: str = "brick"
+    status: str = "existing" # "existing", "demolish", "new"
+    openings: List[Opening] = []
+
+class Room(BaseModel):
+    name: str
+    number: str
+    points: List[Point]
+    floor_material: str = "concrete"
+
+class InteriorPlan(BaseModel):
+    title: str = "Floor Plan"
+    project_number: str = "A-001"
+    organization: str = "Architecture Studio"
+    date: str = "2026-05-05"
+    walls: List[Wall]
+    rooms: List[Room] = []
+    language: str = "ru"
+    paper_format: str = "A4"
+    orientation: str = "landscape"
+    scale: int = 50 # 1:50 default
+    dpi: int = 300
+
 class StadiaMeasurement(BaseModel):
     top_hair: float
     bottom_hair: float

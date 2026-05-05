@@ -10,7 +10,7 @@ import matplotlib.patches as patches
 from matplotlib.font_manager import FontProperties
 import textwrap
 
-from .models import PlotPlan, Point, Zone, AsBuiltPoint, VolumeGrid, ProfilePlan, ProfilePoint
+from .models import PlotPlan, Point, Zone, AsBuiltPoint, VolumeGrid, ProfilePlan, ProfilePoint, InteriorPlan, Wall, Opening, Room
 from .logic import calculate_azimuth_from_points, calculate_area
 
 # --- ISO 128-20:1996 & ISO 128-23:1999 Standards Constants ---
@@ -1297,6 +1297,138 @@ def render_profile_plan(plan: ProfilePlan) -> bytes:
     # 4. Table and Stamp
     _draw_profile_table(fig, plan, pw_mm, ph_mm)
     _draw_stamp(fig, plan, f"H 1:{plan.horiz_scale} / V 1:{plan.vert_scale}", pw_mm, ph_mm, lang=lang)
+    
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=dpi, facecolor='white')
+    buf.seek(0)
+    return buf.getvalue()
+
+def _draw_walls(ax, walls: List[Wall]):
+    """
+    Renders architectural walls with thickness and status-based styling.
+    """
+    for wall in walls:
+        p1, p2 = wall.start_pt, wall.end_pt
+        dx, dy = p2.x - p1.x, p2.y - p1.y
+        length = math.hypot(dx, dy)
+        if length == 0: continue
+        
+        # Style based on status
+        color = 'black'
+        ls = TYPE_01
+        alpha = 1.0
+        if wall.status == 'demolish':
+            color = 'red'
+            ls = (0, (2, 2)) # Fine dashed
+            alpha = 0.6
+        elif wall.status == 'new':
+            color = 'green'
+            alpha = 0.8
+            
+        # Perpendicular vector for thickness
+        nx, ny = _perpendicular_offset(p1, p2, wall.thickness / 2)
+        
+        # Build 4 corners of the wall segment
+        c1 = (p1.x + nx, p1.y + ny)
+        c2 = (p2.x + nx, p2.y + ny)
+        c3 = (p2.x - nx, p2.y - ny)
+        c4 = (p1.x - nx, p1.y - ny)
+        
+        wall_poly = [c1, c2, c3, c4, c1]
+        w_xs, w_ys = zip(*wall_poly)
+        
+        # Fill wall (material)
+        hatch = _get_hatch(wall.material)
+        ax.fill(w_xs, w_ys, color=color if wall.status != 'existing' else 'lightgray', 
+                alpha=0.2 if wall.status == 'existing' else 0.3, zorder=4)
+        if hatch:
+            ax.fill(w_xs, w_ys, fill=False, hatch=hatch, edgecolor=color, linewidth=0, alpha=0.3, zorder=5)
+            
+        # Draw outline
+        ax.plot(w_xs, w_ys, color=color, linewidth=D_WIDE/MM_TO_PT, linestyle=ls, alpha=alpha, zorder=6)
+
+        # Draw Openings (Doors/Windows)
+        _draw_openings(ax, wall, p1, p2, dx, dy, length, nx, ny)
+
+def _draw_openings(ax, wall, p1, p2, dx, dy, length, nx, ny):
+    for op in wall.openings:
+        # Calculate opening start and end on the centerline
+        ux, uy = dx / length, dy / length
+        ox1 = p1.x + ux * op.start_distance
+        oy1 = p1.y + uy * op.start_distance
+        ox2 = ox1 + ux * op.width
+        oy2 = oy1 + uy * op.width
+        
+        if op.type == "window":
+            # Clear the wall fill (draw a white background)
+            win_c1 = (ox1 + nx, oy1 + ny)
+            win_c2 = (ox2 + nx, oy2 + ny)
+            win_c3 = (ox2 - nx, oy2 - ny)
+            win_c4 = (ox1 - nx, oy1 - ny)
+            ax.fill(*zip(win_c1, win_c2, win_c3, win_c4), color='white', zorder=7)
+            
+            # Internal window lines
+            ax.plot([ox1, ox2], [oy1, oy2], color='black', lw=D/MM_TO_PT, zorder=8)
+            ax.plot([ox1+nx*0.5, ox2+nx*0.5], [oy1+ny*0.5, oy2+ny*0.5], color='black', lw=D/MM_TO_PT, zorder=8)
+            ax.plot([ox1-nx*0.5, ox2-nx*0.5], [oy1-ny*0.5, oy2-ny*0.5], color='black', lw=D/MM_TO_PT, zorder=8)
+            
+        elif op.type == "door":
+            # Door opening arc
+            # Normal vector in direction of opening
+            dnx, dny = nx / (wall.thickness/2) * op.width, ny / (wall.thickness/2) * op.width
+            if op.direction == -1: dnx, dny = -dnx, -dny
+            
+            ax.plot([ox1, ox1 + dnx], [oy1, oy1 + dny], color='black', lw=D/MM_TO_PT, zorder=9)
+            
+            # Arc
+            angle_wall = math.degrees(math.atan2(dy, dx))
+            theta1 = angle_wall
+            theta2 = angle_wall + (90 if op.direction == 1 else -90)
+            if theta1 > theta2: theta1, theta2 = theta2, theta1
+            
+            arc = patches.Arc((ox1, oy1), op.width*2, op.width*2, angle=0, 
+                             theta1=theta1, theta2=theta2, color='black', lw=D/MM_TO_PT, zorder=9)
+            ax.add_patch(arc)
+            # Cover the wall segment
+            ax.fill(*zip((ox1+nx, oy1+ny), (ox2+nx, oy2+ny), (ox2-nx, oy2-ny), (ox1-nx, oy1-ny)), color='white', zorder=7)
+
+def render_interior_plan(plan: InteriorPlan) -> bytes:
+    dpi = plan.dpi
+    base_w, base_h = PAPER_SIZES.get(plan.paper_format.upper(), PAPER_SIZES["A4"])
+    pw_mm, ph_mm = (base_w, base_h) if plan.orientation == "landscape" else (base_h, base_w)
+    fig = Figure(figsize=(pw_mm / 25.4, ph_mm / 25.4), dpi=dpi)
+    
+    ax_frame = fig.add_axes([0, 0, 1, 1]); ax_frame.set_axis_off()
+    ax_frame.set_xlim(0, pw_mm); ax_frame.set_ylim(0, ph_mm)
+    ax_frame.add_patch(Rectangle((MARGIN_LEFT, MARGIN_OTHER), pw_mm-MARGIN_LEFT-MARGIN_OTHER, ph_mm-2*MARGIN_OTHER, fill=False, lw=D_WIDE/MM_TO_PT))
+    _draw_sheet_reference_grid(ax_frame, pw_mm, ph_mm)
+    
+    # Calculate Axis
+    draw_w_mm = pw_mm - MARGIN_LEFT - MARGIN_OTHER - 20
+    draw_h_mm = ph_mm - 2 * MARGIN_OTHER - STAMP_HEIGHT - 10
+    ax = fig.add_axes([(MARGIN_LEFT+10)/pw_mm, (MARGIN_OTHER+STAMP_HEIGHT+5)/ph_mm, draw_w_mm/pw_mm, draw_h_mm/ph_mm])
+    ax.set_aspect('equal')
+    
+    all_pts = []
+    for w in plan.walls: all_pts.extend([w.start_pt, w.end_pt])
+    xs, ys = [p.x for p in all_pts], [p.y for p in all_pts]
+    cx, cy = (min(xs)+max(xs))/2, (min(ys)+max(ys))/2
+    
+    m_per_mm = plan.scale / 1000.0
+    view_w_m = draw_w_mm * m_per_mm
+    view_h_m = draw_h_mm * m_per_mm
+    ax.set_xlim(cx - view_w_m/2, cx + view_w_m/2)
+    ax.set_ylim(cy - view_h_m/2, cy + view_h_m/2)
+    
+    _draw_walls(ax, plan.walls)
+    
+    for rm in plan.rooms:
+        rx, ry = _centroid(rm.points)
+        area = calculate_area(rm.points) or 0
+        ax.text(rx, ry, f"{rm.number}\n{area:.2f} m²", fontproperties=_get_font(7, bold=True), 
+                ha='center', va='center', bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8, edgecolor='none'))
+    
+    _draw_stamp(fig, plan, f"1:{plan.scale}", pw_mm, ph_mm, lang=plan.language)
     
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=dpi, facecolor='white')
