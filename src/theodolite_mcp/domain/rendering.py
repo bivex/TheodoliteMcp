@@ -16,6 +16,23 @@ from .logic import calculate_azimuth_from_points, calculate_area
 # All units in points (1 pt = 1/72 inch). 1 mm = 72/25.4 pt ≈ 2.835 pt.
 MM_TO_PT = 72 / 25.4
 
+# ISO 5457:1999 Paper Formats (in mm)
+PAPER_SIZES = {
+    "A0": (1189, 841),
+    "A1": (841, 594),
+    "A2": (594, 420),
+    "A3": (420, 297),
+    "A4": (297, 210),
+}
+
+# ISO 5457 Margins (mm)
+MARGIN_LEFT = 20.0
+MARGIN_OTHER = 10.0
+
+# ISO 7200:2004 Title Block (Stamp) Constants (mm)
+STAMP_WIDTH = 185.0
+STAMP_HEIGHT = 55.0
+
 D = 0.35 * MM_TO_PT          # Narrow (d)
 D_WIDE = 0.7 * MM_TO_PT      # Wide (2d)
 D_EXTRA_WIDE = 1.4 * MM_TO_PT # Extra-wide (4d)
@@ -376,10 +393,22 @@ def _draw_distances(ax, points: List[Point], standard: str = "construction", fon
         
         tx_off, ty_off = ox_unit * text_offset, oy_unit * text_offset
         
-        # Distance (always on top relative to line direction)
-        ax.text(mx + ox_line + tx_off, my + oy_line + ty_off, f'{dist:.2f}', 
-                fontsize=fontsize, ha='center', va='bottom', rotation=angle_deg, zorder=10, style='italic',
-                bbox=dict(facecolor='white', edgecolor='none', alpha=1.0, pad=0.2))
+        # Distance (ISO 129-1: placement)
+        # Check if distance text fits between dimension lines
+        # Approx 2mm per digit + padding
+        text_width_mm = (len(f'{dist:.2f}') * 2.0 + 2.0)
+        text_fits = (dist / m_per_pt / MM_TO_PT) > text_width_mm
+        
+        if text_fits:
+            ax.text(mx + ox_line + tx_off, my + oy_line + ty_off, f'{dist:.2f}', 
+                    fontsize=fontsize, ha='center', va='bottom', rotation=angle_deg, zorder=10, style='italic',
+                    bbox=dict(facecolor='white', edgecolor='none', alpha=1.0, pad=0.1))
+        else:
+            # ISO 129-1: Small gap - move text outside or use leader
+            # Here we move it slightly further and use a leader if very small
+            _draw_leader(ax, mx + ox_line, my + oy_line, f'{dist:.2f}', 
+                         offset_x=ox_unit * 10, offset_y=oy_unit * 10, 
+                         terminator="none", m_per_pt=m_per_pt, fontsize=fontsize-0.5)
         
         # Azimuth (below line)
         if show_azimuths:
@@ -408,92 +437,140 @@ def _draw_scale_bar(ax, x_span: float, width_inches: float, lang: str = "ru"):
     ax.text(x_pos + sb_len_m/2, y_pos - (ylim[1]-ylim[0])*0.02, f"{int(sb_len_m)}{texts['unit_m']}", 
             fontsize=7, ha='center', va='top', fontweight='bold')
 
-def _calculate_auto_scale(x_span: float, width_inches: float) -> str:
-    if width_inches <= 0: return 'N/A'
-    raw_scale = (x_span * 1000) / (width_inches * 25.4)
-    std_scales = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000]
+def _calculate_auto_scale(x_span: float, available_width_mm: float) -> int:
+    """ISO 5455:1981 - Strict standard scales."""
+    if available_width_mm <= 0: return 100
+    raw_scale = (x_span * 1000) / available_width_mm
+    # Standard engineering scales (ISO 5455)
+    std_scales = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
+    # Add common construction scales 
+    std_scales.extend([2.5, 25, 250, 2500, 25000])
+    std_scales.sort()
+    
     for s in std_scales:
-        if s >= raw_scale: return f'1:{s}'
-    return f'1:{int(raw_scale)}'
+        if s >= raw_scale: return int(s)
+    return int(raw_scale)
 
-def _draw_stamp(fig, plan: PlotPlan, scale_str: str, lang: str = "ru"):
+def _draw_stamp(fig, plan: PlotPlan, scale_str: str, pw_mm: float, ph_mm: float, lang: str = "ru"):
     texts = I18N.get(lang, I18N["ru"])
-    # ISO 7200 inspired title block
-    ax_stamp = fig.add_axes([0.6, 0.05, 0.35, 0.2])
+    # ISO 7200 Title Block - Absolute positioning in mm
+    # Position: Bottom Right of the inner frame
+    # Frame is at (MARGIN_LEFT, MARGIN_OTHER) to (pw_mm - MARGIN_OTHER, ph_mm - MARGIN_OTHER)
+    
+    left_mm = pw_mm - MARGIN_OTHER - STAMP_WIDTH
+    bottom_mm = MARGIN_OTHER
+    
+    # Normalize for add_axes
+    ax_stamp = fig.add_axes([left_mm / pw_mm, bottom_mm / ph_mm, STAMP_WIDTH / pw_mm, STAMP_HEIGHT / ph_mm])
     ax_stamp.set_xticks([]); ax_stamp.set_yticks([]); ax_stamp.set_facecolor('white')
     for spine in ax_stamp.spines.values(): spine.set_linewidth(D_WIDE/MM_TO_PT)
     
-    # Internal grid
-    ax_stamp.axhline(0.25, color='black', lw=D/MM_TO_PT)
-    ax_stamp.axhline(0.5, color='black', lw=D/MM_TO_PT)
-    ax_stamp.axhline(0.75, color='black', lw=D/MM_TO_PT)
-    ax_stamp.axvline(0.3, color='black', lw=D/MM_TO_PT)
+    # Internal grid (ISO 7200 inspired layout)
+    ax_stamp.axhline(0.2, color='black', lw=D/MM_TO_PT)
+    ax_stamp.axhline(0.4, color='black', lw=D/MM_TO_PT)
+    ax_stamp.axhline(0.6, color='black', lw=D/MM_TO_PT)
+    ax_stamp.axvline(0.2, color='black', lw=D/MM_TO_PT)
     
-    font_p = {'fontsize': 7.5, 'family': 'sans-serif', 'style': 'italic'}
-    font_b = {'fontsize': 8, 'fontweight': 'bold'}
+    font_p = {'fontsize': 6.5, 'family': 'sans-serif', 'style': 'italic'}
+    font_b = {'fontsize': 7.5, 'fontweight': 'bold'}
     
     # Row 1: Project Number
-    ax_stamp.text(0.05, 0.875, texts["project_no"], **font_p, va='center')
-    ax_stamp.text(0.35, 0.875, plan.project_number, **font_b, va='center')
+    ax_stamp.text(0.02, 0.9, texts["project_no"], **font_p, va='center')
+    ax_stamp.text(0.22, 0.9, plan.project_number, **font_b, va='center')
     
     # Row 2: Organization
-    ax_stamp.text(0.05, 0.625, texts["org"], **font_p, va='center')
-    ax_stamp.text(0.35, 0.625, plan.organization, **font_b, va='center')
+    ax_stamp.text(0.02, 0.7, texts["org"], **font_p, va='center')
+    ax_stamp.text(0.22, 0.7, plan.organization, **font_b, va='center')
     
     # Row 3: Title (Project)
-    ax_stamp.text(0.05, 0.375, texts["project"], **font_p, va='center')
-    wrapped_title = '\n'.join(textwrap.wrap(plan.title, width=30))
-    ax_stamp.text(0.35, 0.375, wrapped_title, **font_b, va='center')
+    ax_stamp.text(0.02, 0.5, texts["project"], **font_p, va='center')
+    wrapped_title = '\n'.join(textwrap.wrap(plan.title, width=45))
+    ax_stamp.text(0.22, 0.5, wrapped_title, **font_b, va='center')
     
     # Row 4: Date, Stage, Scale
-    ax_stamp.text(0.05, 0.125, texts["date"], **font_p, va='center')
-    ax_stamp.text(0.35, 0.125, plan.date, fontsize=7, va='center')
+    ax_stamp.text(0.02, 0.3, texts["date"], **font_p, va='center')
+    ax_stamp.text(0.22, 0.3, plan.date, fontsize=6.5, va='center')
     
-    ax_stamp.axvline(0.55, ymin=0, ymax=0.25, color='black', lw=D)
-    ax_stamp.text(0.57, 0.125, texts["scale"], **font_p, va='center')
-    ax_stamp.text(0.75, 0.125, scale_str, **font_b, va='center')
+    # Scale box
+    ax_stamp.axvline(0.5, ymin=0, ymax=0.4, color='black', lw=D/MM_TO_PT)
+    ax_stamp.text(0.52, 0.3, texts["scale"], **font_p, va='center')
+    ax_stamp.text(0.75, 0.3, scale_str, **font_b, va='center')
+    
+    # Row 5: Drawing Name
+    ax_stamp.text(0.02, 0.1, texts["draft"], **font_p, va='center')
+    ax_stamp.text(0.22, 0.1, plan.title, **font_b, va='center')
 
-def _draw_explication(fig, zones: List[Zone], total_area: float, lang: str = "ru"):
+def _draw_explication(fig, zones: List[Zone], total_area: float, pw_mm: float, ph_mm: float, lang: str = "ru"):
     texts = I18N.get(lang, I18N["ru"])
-    ax_leg = fig.add_axes([0.05, 0.05, 0.35, 0.25])
+    # Position: Bottom Left of the inner frame, next to Margin Left
+    width_mm = 80.0
+    height_mm = STAMP_HEIGHT
+    left_mm = MARGIN_LEFT
+    bottom_mm = MARGIN_OTHER
+    
+    ax_leg = fig.add_axes([left_mm / pw_mm, bottom_mm / ph_mm, width_mm / pw_mm, height_mm / ph_mm])
     ax_leg.set_axis_off()
+    
     font_props = {'family': 'sans-serif', 'style': 'italic'}
     y_pos = 0.95
-    ax_leg.text(0, y_pos, texts["explication"], fontsize=9, fontweight='bold', **font_props)
+    ax_leg.text(0, y_pos, texts["explication"], fontsize=8, fontweight='bold', **font_props)
+    y_pos -= 0.12
+    ax_leg.text(0, y_pos, f"{texts['total_area']} {total_area:.1f} м²", fontsize=7, fontweight='bold', **font_props)
+    y_pos -= 0.12
+    
+    # Headers
+    ax_leg.text(0, y_pos, texts["num"], fontsize=6.5, fontweight='bold', **font_props)
+    ax_leg.text(0.12, y_pos, texts["name"], fontsize=6.5, fontweight='bold', **font_props)
+    ax_leg.text(0.8, y_pos, texts["area_sqm"], fontsize=6.5, fontweight='bold', **font_props)
     y_pos -= 0.1
-    ax_leg.text(0, y_pos, f"{texts['total_area']} {total_area:.1f} м² ({total_area/100:.2f} {texts['sotki']})", fontsize=8, fontweight='bold', **font_props)
-    y_pos -= 0.1
-    ax_leg.text(0, y_pos, texts["num"], fontsize=7.5, fontweight='bold', **font_props)
-    ax_leg.text(0.1, y_pos, texts["name"], fontsize=7.5, fontweight='bold', **font_props)
-    ax_leg.text(0.7, y_pos, texts["area_sqm"], fontsize=7.5, fontweight='bold', **font_props)
-    y_pos -= 0.08
+    
     for i, zone in enumerate(zones):
         if y_pos < 0.05:
-            ax_leg.text(0, y_pos, texts["others"], fontsize=7.5, fontstyle='italic')
+            ax_leg.text(0, y_pos, texts["others"], fontsize=6, fontstyle='italic')
             break
         area = calculate_area(zone.points) or 0
-        ax_leg.text(0, y_pos, str(i + 1), fontsize=7.5, **font_props)
-        ax_leg.text(0.1, y_pos, zone.name[:24], fontsize=7.5, **font_props)
-        ax_leg.text(0.7, y_pos, f'{area:.1f}', fontsize=7.5, **font_props)
-        y_pos -= 0.06
+        ax_leg.text(0, y_pos, str(i + 1), fontsize=6.5, **font_props)
+        ax_leg.text(0.12, y_pos, zone.name[:18], fontsize=6.5, **font_props)
+        ax_leg.text(0.8, y_pos, f'{area:.1f}', fontsize=6.5, **font_props)
+        y_pos -= 0.08
 
 def _draw_north_arrow(ax, lang: str = "ru"):
     texts = I18N.get(lang, I18N["ru"])
     xlim, ylim = ax.get_xlim(), ax.get_ylim()
     # Position fixed relative to axis viewport
-    x, y = xlim[0] + (xlim[1] - xlim[0]) * 0.05, ylim[1] - (ylim[1] - ylim[0]) * 0.12
-    arrow_len = (ylim[1] - ylim[0]) * 0.08
+    x, y = xlim[0] + (xlim[1] - xlim[0]) * 0.08, ylim[1] - (ylim[1] - ylim[0]) * 0.1
+    arrow_len = (ylim[1] - ylim[0]) * 0.06
     ax.annotate('', xy=(x, y + arrow_len), xytext=(x, y), arrowprops=dict(arrowstyle='fancy', color='black', linewidth=D_SYMBOL))
-    ax.text(x, y + arrow_len + arrow_len*0.25, texts["north"], fontsize=10.5, fontweight='bold', ha='center')
+    ax.text(x, y + arrow_len + arrow_len*0.3, texts["north"], fontsize=9, fontweight='bold', ha='center')
 
 def render_plot_plan(plan: PlotPlan) -> bytes:
-    dpi = plan.dpi if plan.dpi >= 150 else 150
+    dpi = plan.dpi if plan.dpi >= 150 else 300
     lang = plan.language or "ru"
-    fig = Figure(figsize=(plan.width_inches, plan.height_inches), dpi=dpi)
-    ax = fig.add_axes([0.1, 0.35, 0.8, 0.55])
     
+    # 1. Determine Paper Size (ISO 5457)
+    base_w, base_h = PAPER_SIZES.get(plan.paper_format.upper(), PAPER_SIZES["A4"])
+    if plan.orientation == "portrait":
+        pw_mm, ph_mm = base_h, base_w
+    else:
+        pw_mm, ph_mm = base_w, base_h
+    
+    fig = Figure(figsize=(pw_mm / 25.4, ph_mm / 25.4), dpi=dpi)
+    
+    # 2. Draw Frame (ISO 5457)
+    ax_frame = fig.add_axes([0, 0, 1, 1])
+    ax_frame.set_axis_off()
+    ax_frame.set_xlim(0, pw_mm); ax_frame.set_ylim(0, ph_mm)
+    
+    frame_rect = Rectangle((MARGIN_LEFT, MARGIN_OTHER), 
+                           pw_mm - MARGIN_LEFT - MARGIN_OTHER, 
+                           ph_mm - 2 * MARGIN_OTHER,
+                           fill=False, color='black', linewidth=D_WIDE/MM_TO_PT)
+    ax_frame.add_patch(frame_rect)
+    
+    # 3. Calculate Scale (ISO 5455)
     all_points = list(plan.boundary_points)
     for zone in plan.zones: all_points.extend(zone.points)
+    
     if not all_points:
         fig.savefig(io.BytesIO(), format='png'); return b''
         
@@ -501,20 +578,35 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     x_min, x_max, y_min, y_max = min(xs), max(xs), min(ys), max(ys)
     x_span, y_span = x_max - x_min or 1, y_max - y_min or 1
     
-    scale_str = _calculate_auto_scale(x_span * 1.5, plan.width_inches * 0.8)
-    ax.set_xlim(x_min - x_span*0.28, x_max + x_span*0.28)
-    ax.set_ylim(y_min - y_span*0.28, y_max + y_span*0.28)
+    # Available area mm
+    avail_w_mm = pw_mm - MARGIN_LEFT - MARGIN_OTHER - 20 # 10mm padding each side
+    avail_h_mm = ph_mm - 2 * MARGIN_OTHER - STAMP_HEIGHT - 20
+    
+    scale_val = _calculate_auto_scale(max(x_span, y_span), min(avail_w_mm, avail_h_mm))
+    scale_str = f"1:{scale_val}"
+    
+    m_per_mm = scale_val / 1000.0
+    m_per_pt = m_per_mm / MM_TO_PT
+    
+    # 4. Main Drawing Axis
+    # Center object in the available area
+    main_w_norm = avail_w_mm / pw_mm
+    main_h_norm = avail_h_mm / ph_mm
+    main_left_norm = (MARGIN_LEFT + (pw_mm - MARGIN_LEFT - MARGIN_OTHER - avail_w_mm)/2) / pw_mm
+    main_bottom_norm = (MARGIN_OTHER + STAMP_HEIGHT + 10) / ph_mm
+    
+    ax = fig.add_axes([main_left_norm, main_bottom_norm, main_w_norm, main_h_norm])
     ax.set_aspect('equal')
     
-    # ISO 128-23: Narrow line for grid (01.1)
-    ax.grid(True, which='both', color='#F0F0F0', linestyle=TYPE_01, linewidth=D, zorder=0)
-    ax.tick_params(labelsize=7.5)
-    ax.set_xlabel("X (m)", fontsize=7.5, style='italic'); ax.set_ylabel("Y (m)", fontsize=7.5, style='italic')
+    cx, cy = (x_min + x_max) / 2, (y_min + y_max) / 2
+    view_w_m = avail_w_mm * m_per_mm
+    view_h_m = avail_h_mm * m_per_mm
+    ax.set_xlim(cx - view_w_m/2, cx + view_w_m/2)
+    ax.set_ylim(cy - view_h_m/2, cy + view_h_m/2)
     
-    # Calculate scale factor: meters per point
-    # Width of axes in points = (width_inches * 0.8) * 72
-    ax_width_pt = plan.width_inches * 0.8 * 72
-    m_per_pt = (x_max - x_min + x_span*0.56) / ax_width_pt if ax_width_pt > 0 else 0.1
+    ax.grid(True, which='both', color='#F8F8F8', linestyle=TYPE_01, linewidth=D, zorder=0)
+    ax.tick_params(labelsize=6.5)
+    ax.set_xlabel("X (m)", fontsize=6.5, style='italic'); ax.set_ylabel("Y (m)", fontsize=6.5, style='italic')
     
     if plan.zones: _draw_zones(ax, plan.zones, show_areas=plan.show_areas, standard=plan.standard, m_per_pt=m_per_pt)
     _draw_boundary(ax, plan.boundary_points, standard=plan.standard)
@@ -523,25 +615,22 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
         _draw_vertex_labels(ax, plan.boundary_points, standard=plan.standard, 
                            m_per_pt=m_per_pt, show_coords=plan.coordinate_labels)
     if plan.show_distances: 
-        _draw_distances(ax, plan.boundary_points, standard=plan.standard, fontsize=7.5, 
+        _draw_distances(ax, plan.boundary_points, standard=plan.standard, fontsize=7, 
                         show_azimuths=plan.show_azimuths, m_per_pt=m_per_pt)
     
     if plan.show_scale_bar:
-        _draw_scale_bar(ax, x_span, plan.width_inches, lang=lang)
+        _draw_scale_bar(ax, x_span, pw_mm / 25.4, lang=lang)
         
     if plan.standard == "shipbuilding":
-        # ISO 128-15: STERN left, BOW right
         texts = I18N.get(lang, I18N["ru"])
-        ax.text(x_min - x_span*0.18, (y_min+y_max)/2, texts.get("stern", "STERN"), 
-                fontsize=9, fontweight='bold', ha='right', va='center', rotation=90)
-        ax.text(x_max + x_span*0.18, (y_min+y_max)/2, texts.get("bow", "BOW"), 
-                fontsize=9, fontweight='bold', ha='left', va='center', rotation=-90)
+        ax.text(ax.get_xlim()[0], cy, texts.get("stern", "STERN"), fontsize=8, fontweight='bold', ha='left', va='center', rotation=90)
+        ax.text(ax.get_xlim()[1], cy, texts.get("bow", "BOW"), fontsize=8, fontweight='bold', ha='right', va='center', rotation=-90)
     else:
         _draw_north_arrow(ax, lang=lang)
     
     total_area = calculate_area(plan.boundary_points) or 0
-    _draw_explication(fig, plan.zones, total_area, lang=lang)
-    _draw_stamp(fig, plan, scale_str, lang=lang)
+    _draw_explication(fig, plan.zones, total_area, pw_mm, ph_mm, lang=lang)
+    _draw_stamp(fig, plan, scale_str, pw_mm, ph_mm, lang=lang)
     
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=dpi, facecolor='white')

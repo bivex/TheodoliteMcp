@@ -48,6 +48,8 @@ def create_construction_demo():
         zones=zones,
         language="en",
         standard="construction",
+        paper_format="A3",
+        orientation="landscape",
         show_vertex_labels=True,
         show_distances=True,
         show_azimuths=True,
