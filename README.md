@@ -1,39 +1,59 @@
-# Theodolite Survey MCP Server
+# 📐 Theodolite Survey MCP Server
 
-An MCP server for processing theodolite survey field books (traverse adjustment and coordinate calculation).
+A professional-grade MCP server for processing theodolite survey field books, traverse adjustments, and **ISO-compliant** technical drawing generation.
 
-## Features
-- **Traverse Adjustment:** Angular and Linear misclosure adjustment (Compass Rule).
-- **Coordinate Calculation:** X (North), Y (East) generation.
-- **Area Calculation:** Automatic area calculation for closed traverses using the Gauss formula.
-- **Precision Validation:** Automated status report based on industrial standards (1:2000, 1:5000).
-- **Surveying Utilities:** Azimuth calculation, DMS/Decimal conversions.
+![Construction Site Plan](construction_site_plan.png)
+*Example: ISO-compliant plot plan generated automatically from survey data.*
 
-## Demonstration Task
-The repository includes `demo_task.py`, which showcases a real-world scenario: **Planning a construction site.**
+## 🌟 Core Features
 
-It performs the following steps:
-1. Converts field DMS measurements to decimal degrees.
-2. Processes a closed traverse around a site.
-3. Calculates adjusted coordinates, total area, and misclosure.
-4. Evaluates whether the precision meets professional standards.
-5. Determines the azimuth for building axis orientation.
+- **Precision Surveying:** Automated angular and linear misclosure adjustment using the Compass Rule.
+- **ISO Standard Rendering:** Generates professional technical drawings (PNG/PDF) following strict international standards:
+    - **ISO 5457:** Standard paper formats (A0-A4) with precise 20mm/10mm margins.
+    - **ISO 7200:** Non-proportional title blocks (stamps) with absolute dimensions.
+    - **ISO 3098:** Technical lettering using the specialized `osifont`.
+    - **ISO 5455:** Strict engineering scales (1:50, 1:100, 1:500, etc.).
+    - **ISO 129-1:** Smart dimensioning with automatic leaders for tight spaces.
+- **Geodesic Logic:** Area calculation (Gauss formula), Azimuth calculations, and DMS/Decimal conversions.
+- **Validation:** Automatic precision checks against industrial standards (1:2000, 1:5000).
 
-Run the demo:
+## 🚀 Quick Start
+
+### 1. Installation
+Ensure you have Python 3.10+ installed.
+
 ```bash
-PYTHONPATH=src ./venv/bin/python3 demo_task.py
-```
-```bash
-pip install -e .
+# Clone the repository
+git clone https://github.com/your-repo/theodolite-mcp.git
+cd theodolite_mcp
+
+# Install dependencies
+pip install .
 ```
 
-## Running the server
+### 2. Run Demos
+Experience the full pipeline from raw measurements to a finished technical drawing:
+
 ```bash
-python -m theodolite_mcp.infrastructure.mcp_server
+# Generate a professional construction site plan
+PYTHONPATH=src python3 demo_construction.py
+
+# Run a full traverse adjustment task
+PYTHONPATH=src python3 demo_task.py
 ```
 
-## Tools
-- `process_traverse`: Calculates coordinates from survey observations.
-- `calculate_azimuth`: Calculates bearing between two points.
-- `convert_dms_to_decimal`: Degrees, Minutes, Seconds -> Decimal.
-- `convert_decimal_to_dms`: Decimal -> Degrees, Minutes, Seconds.
+## 🛠 Available Tools
+
+| Tool | Description |
+| :--- | :--- |
+| `render_plot_plan` | Generates an ISO-compliant technical drawing from points and zones. |
+| `process_traverse` | Calculates adjusted coordinates from survey observations. |
+| `calculate_azimuth` | Calculates the bearing between two coordinate points. |
+| `convert_dms_to_decimal`| Converts Degrees-Minutes-Seconds to Decimal Degrees. |
+
+## 📐 Industrial Compliance
+
+This server is designed for professionals. Unlike generic plotting libraries, our rendering engine ensures that every line weight, font height, and margin meets **ISO Technical Documentation** requirements, making outputs suitable for official site plans and engineering reports.
+
+## 📄 License
+This project is licensed under the MIT License - see the LICENSE file for details. Technical font `osifont` is licensed under GNU LGPL.
