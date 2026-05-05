@@ -1139,15 +1139,17 @@ def _draw_volume_grid(ax, grid: VolumeGrid, m_per_pt: float = 0.1):
 
 def _draw_profile_table(fig, plan: ProfilePlan, pw_mm: float, ph_mm: float):
     """
-    Renders the classic engineering profile table (the 'Podval').
-    Contains: Station, Distances, Ground Levels, Design Levels.
+    Renders the professional engineering profile table (the 'Podval').
+    Contains: Slopes, Design Levels, Ground Levels, Depths, Distances, Stations.
     """
     # Dimensions (mm)
     table_w = pw_mm - MARGIN_LEFT - MARGIN_OTHER - STAMP_WIDTH - 10
     row_h = 8.0
-    headers_w = 40.0 # Width of the label column
+    headers_w = 40.0 
     
     rows = [
+        {"id": "depth", "label": "Глубина заложения"},
+        {"id": "slope", "label": "Уклоны / Длина"},
         {"id": "design_z", "label": "Проектная отметка"},
         {"id": "ground_z", "label": "Отметка земли"},
         {"id": "dist", "label": "Расстояние"},
@@ -1170,13 +1172,12 @@ def _draw_profile_table(fig, plan: ProfilePlan, pw_mm: float, ph_mm: float):
     # Labels
     for i, row in enumerate(reversed(rows)):
         ax_table.text(2/table_w, (i + 0.5) / len(rows), row["label"], 
-                      fontproperties=_get_font(6.5, bold=True), va='center')
+                      fontproperties=_get_font(6, bold=True), va='center')
 
     # Data Column Mapping
     s_min = plan.points[0].station
     s_max = plan.points[-1].station
     s_span = s_max - s_min or 1.0
-    
     data_w = table_w - headers_w
     def s_to_x(s): return (headers_w + (s - s_min) / s_span * data_w) / table_w
 
@@ -1186,25 +1187,52 @@ def _draw_profile_table(fig, plan: ProfilePlan, pw_mm: float, ph_mm: float):
         ax_table.axvline(x, color='black', lw=D/MM_TO_PT, ymin=0, ymax=1)
         
         # Ground Z
-        ax_table.text(x, 1.5/len(rows) + 1/len(rows)*1, f"{p.ground_z:.2f}", 
-                      fontproperties=_get_font(6), rotation=90, ha='center', va='center')
+        ax_table.text(x, 2.5/len(rows), f"{p.ground_z:.2f}", 
+                      fontproperties=_get_font(5.5), rotation=90, ha='center', va='center')
         
         # Design Z
         if p.design_z is not None:
-            ax_table.text(x, 1.5/len(rows) + 1/len(rows)*2, f"{p.design_z:.2f}", 
-                          fontproperties=_get_font(6), rotation=90, ha='center', va='center', color='red')
+            ax_table.text(x, 3.5/len(rows), f"{p.design_z:.2f}", 
+                          fontproperties=_get_font(5.5), rotation=90, ha='center', va='center', color='red')
+            
+            # Depth (Ground - Design)
+            depth = p.ground_z - p.design_z
+            ax_table.text(x, 5.5/len(rows), f"{depth:.2f}", 
+                          fontproperties=_get_font(5.5), rotation=90, ha='center', va='center', color='blue')
         
         # Station (Picket)
         ax_table.text(x, 0.5/len(rows), f"{p.station:.0f}", 
-                      fontproperties=_get_font(6), ha='center', va='center')
+                      fontproperties=_get_font(5.5), ha='center', va='center')
 
-        # Distance between points
+        # Inter-point data (Distances and Slopes)
         if i > 0:
             prev = plan.points[i-1]
-            dist = p.station - prev.station
-            mx_val = (s_to_x(p.station) + s_to_x(prev.station)) / 2
-            ax_table.text(mx_val, 1.5/len(rows), f"{dist:.1f}", 
-                          fontproperties=_get_font(6), ha='center', va='center')
+            dx = p.station - prev.station
+            mx = (s_to_x(p.station) + s_to_x(prev.station)) / 2
+            
+            # Distance
+            ax_table.text(mx, 1.5/len(rows), f"{dx:.1f}", 
+                          fontproperties=_get_font(5.5), ha='center', va='center')
+            
+            # Slope (‰)
+            if p.design_z is not None and prev.design_z is not None:
+                dz = p.design_z - prev.design_z
+                slope_promille = (dz / dx) * 1000
+                
+                # Draw diagonal slope line
+                y_base = 4.0 / len(rows)
+                y_delta = 0.3 / len(rows)
+                if dz > 0: # Up
+                    ax_table.plot([s_to_x(prev.station), s_to_x(p.station)], [y_base - y_delta, y_base + y_delta], color='black', lw=D/MM_TO_PT)
+                elif dz < 0: # Down
+                    ax_table.plot([s_to_x(prev.station), s_to_x(p.station)], [y_base + y_delta, y_base - y_delta], color='black', lw=D/MM_TO_PT)
+                else: # Horizontal
+                    ax_table.axhline(y_base, xmin=s_to_x(prev.station), xmax=s_to_x(p.station), color='black', lw=D/MM_TO_PT)
+                
+                ax_table.text(mx, y_base + y_delta*1.2, f"{abs(slope_promille):.1f}‰", 
+                              fontproperties=_get_font(5, italic=True), ha='center', va='bottom')
+                ax_table.text(mx, y_base - y_delta*1.2, f"L={dx:.1f}", 
+                              fontproperties=_get_font(5), ha='center', va='top')
 
 def render_profile_plan(plan: ProfilePlan) -> bytes:
     """
@@ -1226,7 +1254,7 @@ def render_profile_plan(plan: ProfilePlan) -> bytes:
     _draw_sheet_reference_grid(ax_frame, pw_mm, ph_mm)
     
     # 2. Calculation of Axes
-    table_h_mm = 32.0 # 4 rows * 8mm
+    table_h_mm = 48.0 # 6 rows * 8mm
     draw_left = MARGIN_LEFT + 10
     draw_bottom = MARGIN_OTHER + table_h_mm + 10
     draw_w = pw_mm - MARGIN_LEFT - MARGIN_OTHER - 20
@@ -1247,12 +1275,23 @@ def render_profile_plan(plan: ProfilePlan) -> bytes:
     ax.set_aspect('auto') 
     
     # 3. Plotting lines
-    ax.plot(stations, grounds, color='black', lw=D/MM_TO_PT)
+    # Ground profile
+    ax.plot(stations, grounds, color='black', lw=D/MM_TO_PT, zorder=3)
+    
+    # Design profile
     if designs:
         d_stations = [p.station for p in plan.points if p.design_z is not None]
-        ax.plot(d_stations, designs, color='red', lw=D_WIDE/MM_TO_PT)
+        ax.plot(d_stations, designs, color='red', lw=D_WIDE/MM_TO_PT, zorder=4)
+        
+    # Vertical Ordinates (Ordinates)
+    # They should drop from points to the bottom of the table
+    # Since they cross multiple axes, we can draw them on the frame axes or a separate axes
+    # Let's draw them in the plot ax but allow clipping to 'off'
+    for p in plan.points:
+        # Line from ground to bottom of viewport
+        ax.axvline(p.station, color='gray', lw=D/MM_TO_PT/2, linestyle=':', alpha=0.5, zorder=1)
     
-    ax.grid(True, linestyle=':', alpha=0.4)
+    ax.grid(True, linestyle=':', alpha=0.3, zorder=0)
     ax.set_title(plan.title, fontproperties=_get_font(10, bold=True))
     
     # 4. Table and Stamp
