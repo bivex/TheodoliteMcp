@@ -1,5 +1,5 @@
 import ezdxf
-from .models import PlotPlan, Point, Zone
+from .models import PlotPlan, Point, Zone, ProfilePlan
 import os
 
 def export_plan_to_dxf(plan: PlotPlan, output_path: str):
@@ -51,5 +51,55 @@ def export_plan_to_dxf(plan: PlotPlan, output_path: str):
             msp.add_text(zone.name, dxfattribs={'layer': '0_TEXT', 'height': 0.7}).set_placement((cx, cy))
 
     # 5. Save
+    doc.saveas(output_path)
+    return output_path
+
+def export_profile_to_dxf(plan: ProfilePlan, output_path: str):
+    """
+    Exports a Longitudinal Profile to a DXF file.
+    Includes the 'podval' table and profile lines.
+    """
+    doc = ezdxf.new('R2010')
+    msp = doc.modelspace()
+    
+    # 1. Layers
+    doc.layers.add(name="V-PROF-GROUND", color=7)
+    doc.layers.add(name="V-PROF-DESIGN", color=1) # Red
+    doc.layers.add(name="V-PROF-TABLE", color=7)
+    doc.layers.add(name="V-PROF-TEXT", color=7)
+    doc.layers.add(name="V-PROF-ORDINATES", color=8) # Gray
+    
+    # Scales
+    h_scale = plan.horiz_scale
+    v_scale = plan.vert_scale
+    exaggeration = h_scale / v_scale
+    
+    # 2. Draw Lines
+    points = plan.points
+    ground_pts = [(p.station, p.ground_z * exaggeration) for p in points]
+    msp.add_lwpolyline(ground_pts, dxfattribs={'layer': 'V-PROF-GROUND'})
+    
+    design_pts = [(p.station, p.design_z * exaggeration) for p in points if p.design_z is not None]
+    if design_pts:
+        msp.add_lwpolyline(design_pts, dxfattribs={'layer': 'V-PROF-DESIGN'})
+        
+    # 3. Draw Ordinates and Table (Simplified logic for CAD)
+    y_table_top = (min(p.ground_z for p in points) - 10) * exaggeration
+    
+    for p in points:
+        # Ordinate line
+        msp.add_line((p.station, p.ground_z * exaggeration), (p.station, y_table_top), 
+                     dxfattribs={'layer': 'V-PROF-ORDINATES'})
+        
+        # Table labels (Vertical)
+        msp.add_text(f"{p.ground_z:.2f}", dxfattribs={'layer': 'V-PROF-TEXT', 'height': 0.5, 'rotation': 90}).set_placement((p.station + 0.2, y_table_top - 5))
+        if p.design_z:
+             msp.add_text(f"{p.design_z:.2f}", dxfattribs={'layer': 'V-PROF-TEXT', 'height': 0.5, 'rotation': 90, 'color': 1}).set_placement((p.station + 0.8, y_table_top - 5))
+             
+    # Table borders
+    table_bottom = y_table_top - 15
+    msp.add_line((points[0].station, y_table_top), (points[-1].station, y_table_top), dxfattribs={'layer': 'V-PROF-TABLE'})
+    msp.add_line((points[0].station, table_bottom), (points[-1].station, table_bottom), dxfattribs={'layer': 'V-PROF-TABLE'})
+    
     doc.saveas(output_path)
     return output_path

@@ -22,6 +22,9 @@ class SurveyService:
     def export_dxf(self, plan: PlotPlan, output_path: str) -> str:
         return export_plan_to_dxf(plan, output_path)
 
+    def export_profile_dxf(self, plan: ProfilePlan, output_path: str) -> str:
+        return export_profile_to_dxf(plan, output_path)
+
     def adjust_network_least_squares(self, observations: List[ObservationLS], 
                                      initial_coords: Dict[str, Dict[str, float]]) -> LSAResult:
         return adjust_network_2d(observations, initial_coords)

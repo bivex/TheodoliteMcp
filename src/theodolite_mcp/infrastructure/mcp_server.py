@@ -250,6 +250,34 @@ def draw_longitudinal_profile(
     return Image(data=png_bytes, format="png")
 
 @mcp.tool()
+def export_profile_to_dxf(
+    title: str = "Longitudinal Profile",
+    points_json: list[dict] = [],
+    filename: str = "exported_profile.dxf",
+    h_scale: int = 1000,
+    v_scale: int = 100,
+) -> str:
+    """
+    Exports a longitudinal profile to a professional DXF file for AutoCAD.
+    Saves the file locally in the 'output' directory and returns the full path.
+    Includes layers for GROUND, DESIGN, TABLE, and ORDINATES.
+    """
+    pts = [ProfilePoint(**p) for p in points_json]
+    plan = ProfilePlan(
+        title=title,
+        points=pts,
+        horiz_scale=h_scale,
+        vert_scale=v_scale
+    )
+
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+    full_path = os.path.join(output_dir, filename)
+    
+    path = service.export_profile_dxf(plan, full_path)
+    return f"✅ Profile DXF successfully exported to: {os.path.abspath(path)}"
+
+@mcp.tool()
 def adjust_network_least_squares(
     observations_json: list[dict],
     initial_coords: dict[str, dict[str, float]]
