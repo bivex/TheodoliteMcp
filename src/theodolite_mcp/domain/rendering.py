@@ -4,6 +4,8 @@ import os
 from typing import List, Optional, Tuple, Dict
 import matplotlib
 matplotlib.use('Agg')
+# ISO 128-50: Hatching line width should be narrow (d = 0.35mm)
+matplotlib.rcParams['hatch.linewidth'] = D / MM_TO_PT 
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 import matplotlib.patches as patches
@@ -168,11 +170,24 @@ def _perpendicular_offset(p1: Point, p2: Point, distance: float = 1.0) -> Tuple[
     return nx, ny
 
 def _get_hatch(name: str) -> Optional[str]:
+    """ISO 128-50: Material hatching patterns."""
     name = name.lower()
-    if any(k in name for k in ['дом', 'house', 'building', 'здание']): return '///'
-    if any(k in name for k in ['огород', 'garden', 'planting', 'теплица']): return '...'
-    if any(k in name for k in ['сад', 'orchard', 'trees', 'цветник']): return 'oo'
-    if any(k in name for k in ['парковка', 'parking', 'paving', 'дорожка']): return 'xxx'
+    # Brick (Brickwork): ISO 128-50 pattern 01 (Diagonal lines)
+    if any(k in name for k in ['кирпич', 'brick']): return '///'
+    # Concrete: ISO 128-50 pattern 02 (Dots/triangles)
+    if any(k in name for k in ['бетон', 'concrete', 'фундамент', 'foundation']): return '...'
+    # Wood: ISO 128-50 pattern 05 (Curved lines/grain) - approximated as 'oo'
+    if any(k in name for k in ['дерево', 'wood', 'timber']): return 'oo'
+    # Metal/Steel: ISO 128-50 pattern 03 (Double diagonal)
+    if any(k in name for k in ['металл', 'metal', 'сталь', 'steel']): return '///' 
+    
+    # Generic buildings
+    if any(k in name for k in ['дом', 'house', 'building', 'здание']): return '//'
+    
+    # Landscaping
+    if any(k in name for k in ['огород', 'garden', 'planting', 'теплица']): return '..'
+    if any(k in name for k in ['сад', 'orchard', 'trees', 'цветник']): return 'o'
+    if any(k in name for k in ['парковка', 'parking', 'paving', 'дорожка']): return 'xxxx'
     return None
 
 def _draw_boundary(ax, points: List[Point], color: str = 'black', standard: str = "construction"):
