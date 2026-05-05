@@ -152,6 +152,7 @@ def draw_plot_plan(
     width: float = 10.0,
     height: float = 10.0,
     dpi: int = 150,
+    output_path: str = None,
 ) -> Image:
     """
     Generate a visual cadastral/site plan showing land plot boundaries, 
@@ -187,7 +188,7 @@ def draw_plot_plan(
         dpi=dpi,
     )
 
-    png_bytes = service.render_plot(plan)
+    png_bytes = service.render_plot(plan, output_path=output_path)
     return Image(data=png_bytes, format="png")
 
 @mcp.tool()

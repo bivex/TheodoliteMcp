@@ -14,9 +14,9 @@ from ..domain.geodesy import (
 class SurveyService:
     def _save_if_needed(self, data: bytes, path: Optional[str]) -> bytes:
         if path:
-            output_dir = Path(path).parent
-            output_dir.mkdir(parents=True, exist_ok=True)
-            with open(path, "wb") as f:
+            output_path = Path(path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, "wb") as f:
                 f.write(data)
         return data
 
