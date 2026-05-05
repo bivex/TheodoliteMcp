@@ -1,3 +1,4 @@
+import os
 import json
 from theodolite_mcp.domain.models import PlotPlan, Point, Zone
 from theodolite_mcp.domain.rendering import render_plot_plan
@@ -50,9 +51,10 @@ def create_ship_demo():
     )
     
     png_bytes = render_plot_plan(plan)
-    with open("shipbuilding_demo_plan.png", "wb") as f:
+    output_path = os.path.join("output", "shipbuilding_demo_plan.png")
+    with open(output_path, "wb") as f:
         f.write(png_bytes)
-    print("🚢 Shipbuilding demo plan generated: shipbuilding_demo_plan.png")
+    print(f"🚢 Shipbuilding demo plan generated: {output_path}")
 
 if __name__ == "__main__":
     create_ship_demo()

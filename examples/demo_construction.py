@@ -63,7 +63,7 @@ def create_construction_demo():
     png_bytes = render_plot_plan(plan)
 
     # 5. Save to file
-    output_path = "construction_site_plan.png"
+    output_path = os.path.join("output", "construction_site_plan.png")
     with open(output_path, "wb") as f:
         f.write(png_bytes)
 

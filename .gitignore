@@ -54,3 +54,7 @@ venv.bak/
 
 # Project specific
 .DS_Store
+output/
+test_*.png
+*.png
+!docs/gallery/*.png

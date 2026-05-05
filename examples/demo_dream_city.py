@@ -105,7 +105,7 @@ def create_dream_city_showcase():
 
     # 4. Render and Save
     png_bytes = render_plot_plan(plan)
-    output_path = "dream_city_plan.png"
+    output_path = os.path.join("output", "dream_city_plan.png")
     with open(output_path, "wb") as f:
         f.write(png_bytes)
 

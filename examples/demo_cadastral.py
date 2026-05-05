@@ -56,7 +56,7 @@ def create_cadastral_demo():
     png_bytes = render_plot_plan(plan)
 
     # 5. Save to file
-    output_path = "cadastral_survey_plan.png"
+    output_path = os.path.join("output", "cadastral_survey_plan.png")
     with open(output_path, "wb") as f:
         f.write(png_bytes)
 
