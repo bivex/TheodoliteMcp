@@ -46,7 +46,7 @@ def _get_font(size=7, bold=False, italic=False):
     return {'fontsize': size, 'fontweight': 'bold' if bold else 'normal', 'style': 'italic' if italic else 'normal'}
 
 D = 0.35 * MM_TO_PT          # Narrow (d)
-matplotlib.rcParams['hatch.linewidth'] = D / MM_TO_PT # ISO 128-50
+matplotlib.rcParams['hatch.linewidth'] = D # ISO 128-50
 D_WIDE = 0.7 * MM_TO_PT      # Wide (2d)
 D_EXTRA_WIDE = 1.4 * MM_TO_PT # Extra-wide (4d)
 D_SYMBOL = 0.5 * MM_TO_PT    # Graphical Symbols
@@ -702,7 +702,7 @@ def _draw_zones(ax, zones: List[Zone], show_areas: bool = False, standard: str =
             # Opaque white bbox (alpha=1.0) creates the 'window' in the hatching
             ax.text(zx, zy, str(i + 1), fontproperties=_get_font(8.5, bold=True), ha='center', va='center', zorder=10,
                     bbox=dict(boxstyle='circle,pad=0.2', facecolor='white', edgecolor='black', 
-                              linewidth=D_SYMBOL/MM_TO_PT, alpha=1.0))
+                              linewidth=D_SYMBOL, alpha=1.0))
         
         if show_areas and area >= 0.5:
             # Inscription below the zone number
@@ -739,7 +739,7 @@ def _draw_leader(ax, target_x: float, target_y: float, text: str,
         ax.annotate("", xy=(target_x, target_y), 
                     xytext=(target_x + math.cos(angle)*0.01, target_y + math.sin(angle)*0.01),
                     arrowprops=dict(arrowstyle='-|>', color='black', mutation_scale=10, 
-                                    linewidth=D/MM_TO_PT, shrinkA=0, shrinkB=0), zorder=7)
+                                    linewidth=D, shrinkA=0, shrinkB=0), zorder=7)
 
     # 3. Reference line (Shelf) - strictly horizontal
     shelf_dir = 1 if offset_x >= 0 else -1
@@ -842,11 +842,11 @@ def _draw_distances(ax, points: List[Point], standard: str = "construction", fon
             ax.annotate("", xy=(p1.x + ox_line, p1.y + oy_line), 
                         xytext=(p1.x + ox_line + math.cos(angle)*ascl, p1.y + oy_line + math.sin(angle)*ascl),
                         arrowprops=dict(arrowstyle='-|>', color='black', mutation_scale=10, 
-                                        linewidth=D/MM_TO_PT, shrinkA=0, shrinkB=0), zorder=5)
+                                        linewidth=D, shrinkA=0, shrinkB=0), zorder=5)
             ax.annotate("", xy=(p2.x + ox_line, p2.y + oy_line), 
                         xytext=(p2.x + ox_line - math.cos(angle)*ascl, p2.y + oy_line - math.sin(angle)*ascl),
                         arrowprops=dict(arrowstyle='-|>', color='black', mutation_scale=10, 
-                                        linewidth=D/MM_TO_PT, shrinkA=0, shrinkB=0), zorder=5)
+                                        linewidth=D, shrinkA=0, shrinkB=0), zorder=5)
         else:
             tick_len = 2.0 * MM_TO_PT * m_per_pt
             for p_base in [(p1.x + ox_line, p1.y + oy_line), (p2.x + ox_line, p2.y + oy_line)]:
@@ -931,13 +931,13 @@ def _draw_stamp(fig, plan: PlotPlan, scale_str: str, pw_mm: float, ph_mm: float,
     # Normalize for add_axes
     ax_stamp = fig.add_axes([left_mm / pw_mm, bottom_mm / ph_mm, STAMP_WIDTH / pw_mm, STAMP_HEIGHT / ph_mm])
     ax_stamp.set_xticks([]); ax_stamp.set_yticks([]); ax_stamp.set_facecolor('white')
-    for spine in ax_stamp.spines.values(): spine.set_linewidth(D_WIDE/MM_TO_PT)
+    for spine in ax_stamp.spines.values(): spine.set_linewidth(D_WIDE)
     
     # Internal grid (ISO 7200 inspired layout)
-    ax_stamp.axhline(0.2, color='black', lw=D/MM_TO_PT)
-    ax_stamp.axhline(0.4, color='black', lw=D/MM_TO_PT)
-    ax_stamp.axhline(0.6, color='black', lw=D/MM_TO_PT)
-    ax_stamp.axvline(0.2, color='black', lw=D/MM_TO_PT)
+    ax_stamp.axhline(0.2, color='black', lw=D)
+    ax_stamp.axhline(0.4, color='black', lw=D)
+    ax_stamp.axhline(0.6, color='black', lw=D)
+    ax_stamp.axvline(0.2, color='black', lw=D)
     
     # Row 1: Project Number
     ax_stamp.text(0.02, 0.9, texts["project_no"], fontproperties=_get_font(6.5, italic=True), va='center')
@@ -957,7 +957,7 @@ def _draw_stamp(fig, plan: PlotPlan, scale_str: str, pw_mm: float, ph_mm: float,
     ax_stamp.text(0.22, 0.3, plan.date, fontproperties=_get_font(6.5), va='center')
     
     # Scale box
-    ax_stamp.axvline(0.5, ymin=0, ymax=0.4, color='black', lw=D/MM_TO_PT)
+    ax_stamp.axvline(0.5, ymin=0, ymax=0.4, color='black', lw=D)
     ax_stamp.text(0.52, 0.3, texts["scale"], fontproperties=_get_font(6.5, italic=True), va='center')
     ax_stamp.text(0.75, 0.3, scale_str, fontproperties=_get_font(7.5, bold=True), va='center')
     
@@ -982,20 +982,20 @@ def _draw_explication(fig, zones: List[Zone], total_area: float, pw_mm: float, p
     
     ax_leg = fig.add_axes([left_mm / pw_mm, bottom_mm / ph_mm, width_mm / pw_mm, table_h / ph_mm])
     ax_leg.set_xticks([]); ax_leg.set_yticks([]); ax_leg.set_facecolor('none')
-    for spine in ax_leg.spines.values(): spine.set_linewidth(D/MM_TO_PT)
+    for spine in ax_leg.spines.values(): spine.set_linewidth(D)
     
     # Column widths (relative)
     c1, c2, c3 = 0.12, 0.68, 0.2
     
     y = 1.0
     # Title row
-    ax_leg.axhline(y, color='black', lw=D_WIDE/MM_TO_PT)
+    ax_leg.axhline(y, color='black', lw=D_WIDE)
     ax_leg.text(0.5, y - (title_h/table_h)/2, texts["explication"], 
                 fontproperties=_get_font(8, bold=True), ha='center', va='center')
     y -= (title_h/table_h)
     
     # Header row
-    ax_leg.axhline(y, color='black', lw=D_WIDE/MM_TO_PT)
+    ax_leg.axhline(y, color='black', lw=D_WIDE)
     h_y = y - (header_h/table_h)/2
     ax_leg.text(c1/2, h_y, texts["num"], fontproperties=_get_font(6.5, bold=True), ha='center', va='center')
     ax_leg.text(c1 + c2/2, h_y, texts["name"], fontproperties=_get_font(6.5, bold=True), ha='center', va='center')
@@ -1006,7 +1006,7 @@ def _draw_explication(fig, zones: List[Zone], total_area: float, pw_mm: float, p
     for i in range(num_rows):
         zone = zones[i]
         area = calculate_area(zone.points) or 0
-        ax_leg.axhline(y, color='black', lw=D/MM_TO_PT)
+        ax_leg.axhline(y, color='black', lw=D)
         row_y = y - (row_h/table_h)/2
         ax_leg.text(c1/2, row_y, str(i + 1), fontproperties=_get_font(6.5), ha='center', va='center')
         ax_leg.text(c1 + 0.02, row_y, zone.name[:24], fontproperties=_get_font(6.5), ha='left', va='center')
@@ -1014,16 +1014,16 @@ def _draw_explication(fig, zones: List[Zone], total_area: float, pw_mm: float, p
         y -= (row_h/table_h)
     
     # Total Area Row
-    ax_leg.axhline(y, color='black', lw=D_WIDE/MM_TO_PT)
+    ax_leg.axhline(y, color='black', lw=D_WIDE)
     row_y = y - (row_h/table_h)/2
     ax_leg.text(c1 + c2/2, row_y, texts["total_area"], fontproperties=_get_font(7, bold=True), ha='center', va='center')
     ax_leg.text(c1 + c2 + c3/2, row_y, f'{total_area:.1f}', fontproperties=_get_font(7, bold=True), ha='center', va='center')
     y -= (row_h/table_h)
-    ax_leg.axhline(y, color='black', lw=D_WIDE/MM_TO_PT)
+    ax_leg.axhline(y, color='black', lw=D_WIDE)
     
     # Vertical lines
-    ax_leg.axvline(c1, color='black', lw=D/MM_TO_PT, ymin=y, ymax=1-(title_h/table_h))
-    ax_leg.axvline(c1+c2, color='black', lw=D/MM_TO_PT, ymin=y, ymax=1-(title_h/table_h))
+    ax_leg.axvline(c1, color='black', lw=D, ymin=y, ymax=1-(title_h/table_h))
+    ax_leg.axvline(c1+c2, color='black', lw=D, ymin=y, ymax=1-(title_h/table_h))
 
 def _draw_north_arrow(ax, lang: str = "ru"):
     texts = I18N.get(lang, I18N["ru"])
@@ -1039,13 +1039,13 @@ def _draw_sheet_reference_grid(ax_frame, pw_mm: float, ph_mm: float):
     # 1. Centering Marks (5mm long, Wide line)
     mark_len = 5.0
     # Top
-    ax_frame.plot([pw_mm/2, pw_mm/2], [ph_mm, ph_mm - mark_len], color='black', lw=D_WIDE/MM_TO_PT)
+    ax_frame.plot([pw_mm/2, pw_mm/2], [ph_mm, ph_mm - mark_len], color='black', lw=D_WIDE)
     # Bottom
-    ax_frame.plot([pw_mm/2, pw_mm/2], [0, mark_len], color='black', lw=D_WIDE/MM_TO_PT)
+    ax_frame.plot([pw_mm/2, pw_mm/2], [0, mark_len], color='black', lw=D_WIDE)
     # Left
-    ax_frame.plot([0, mark_len], [ph_mm/2, ph_mm/2], color='black', lw=D_WIDE/MM_TO_PT)
+    ax_frame.plot([0, mark_len], [ph_mm/2, ph_mm/2], color='black', lw=D_WIDE)
     # Right
-    ax_frame.plot([pw_mm, pw_mm - mark_len], [ph_mm/2, ph_mm/2], color='black', lw=D_WIDE/MM_TO_PT)
+    ax_frame.plot([pw_mm, pw_mm - mark_len], [ph_mm/2, ph_mm/2], color='black', lw=D_WIDE)
 
     # 2. Reference Grid (approx 50mm segments)
     # Horizontal (Numbers 1, 2, 3...)
@@ -1060,8 +1060,8 @@ def _draw_sheet_reference_grid(ax_frame, pw_mm: float, ph_mm: float):
         # Ticks
         if i > 0:
             tx = MARGIN_LEFT + i * h_step
-            ax_frame.plot([tx, tx], [ph_mm, ph_mm - MARGIN_OTHER], color='black', lw=D/MM_TO_PT)
-            ax_frame.plot([tx, tx], [0, MARGIN_OTHER], color='black', lw=D/MM_TO_PT)
+            ax_frame.plot([tx, tx], [ph_mm, ph_mm - MARGIN_OTHER], color='black', lw=D)
+            ax_frame.plot([tx, tx], [0, MARGIN_OTHER], color='black', lw=D)
 
     # Vertical (Letters A, B, C...)
     v_segments = int((ph_mm - 2 * MARGIN_OTHER) / 50) or 1
@@ -1077,8 +1077,8 @@ def _draw_sheet_reference_grid(ax_frame, pw_mm: float, ph_mm: float):
         # Ticks
         if i > 0:
             ty = ph_mm - MARGIN_OTHER - i * v_step
-            ax_frame.plot([0, MARGIN_LEFT], [ty, ty], color='black', lw=D/MM_TO_PT)
-            ax_frame.plot([pw_mm, pw_mm - MARGIN_OTHER], [ty, ty], color='black', lw=D/MM_TO_PT)
+            ax_frame.plot([0, MARGIN_LEFT], [ty, ty], color='black', lw=D)
+            ax_frame.plot([pw_mm, pw_mm - MARGIN_OTHER], [ty, ty], color='black', lw=D)
 
 def _draw_as_built_deviations(ax, points: List[AsBuiltPoint], m_per_pt: float = 0.1):
     """
@@ -1123,7 +1123,7 @@ def _draw_volume_grid(ax, grid: VolumeGrid, m_per_pt: float = 0.1):
         rect = Rectangle((cell.center_x - s2, cell.center_y - s2), 
                            cell.size_m, cell.size_m, 
                            fill=True, facecolor='blue' if cell.volume > 0 else 'red', alpha=0.05,
-                           edgecolor='black', linewidth=D/MM_TO_PT, linestyle=':')
+                           edgecolor='black', linewidth=D, linestyle=':')
         ax.add_patch(rect)
         
         # Center: Volume
@@ -1162,12 +1162,12 @@ def _draw_profile_table(fig, plan: ProfilePlan, pw_mm: float, ph_mm: float):
     
     ax_table = fig.add_axes([left_mm / pw_mm, bottom_mm / ph_mm, table_w / pw_mm, table_h / ph_mm])
     ax_table.set_xticks([]); ax_table.set_yticks([]); ax_table.set_facecolor('white')
-    for spine in ax_table.spines.values(): spine.set_linewidth(D/MM_TO_PT)
+    for spine in ax_table.spines.values(): spine.set_linewidth(D)
     
     # Grid lines
     for i in range(len(rows) + 1):
-        ax_table.axhline(i / len(rows), color='black', lw=D/MM_TO_PT)
-    ax_table.axvline(headers_w / table_w, color='black', lw=D/MM_TO_PT)
+        ax_table.axhline(i / len(rows), color='black', lw=D)
+    ax_table.axvline(headers_w / table_w, color='black', lw=D)
     
     # Labels
     for i, row in enumerate(reversed(rows)):
@@ -1184,7 +1184,7 @@ def _draw_profile_table(fig, plan: ProfilePlan, pw_mm: float, ph_mm: float):
     for i, p in enumerate(plan.points):
         x = s_to_x(p.station)
         # Vertical tick
-        ax_table.axvline(x, color='black', lw=D/MM_TO_PT, ymin=0, ymax=1)
+        ax_table.axvline(x, color='black', lw=D, ymin=0, ymax=1)
         
         # Ground Z
         ax_table.text(x, 2.5/len(rows), f"{p.ground_z:.2f}", 
@@ -1223,11 +1223,11 @@ def _draw_profile_table(fig, plan: ProfilePlan, pw_mm: float, ph_mm: float):
                 y_base = 4.0 / len(rows)
                 y_delta = 0.3 / len(rows)
                 if dz > 0: # Up
-                    ax_table.plot([s_to_x(prev.station), s_to_x(p.station)], [y_base - y_delta, y_base + y_delta], color='black', lw=D/MM_TO_PT)
+                    ax_table.plot([s_to_x(prev.station), s_to_x(p.station)], [y_base - y_delta, y_base + y_delta], color='black', lw=D)
                 elif dz < 0: # Down
-                    ax_table.plot([s_to_x(prev.station), s_to_x(p.station)], [y_base + y_delta, y_base - y_delta], color='black', lw=D/MM_TO_PT)
+                    ax_table.plot([s_to_x(prev.station), s_to_x(p.station)], [y_base + y_delta, y_base - y_delta], color='black', lw=D)
                 else: # Horizontal
-                    ax_table.axhline(y_base, xmin=s_to_x(prev.station), xmax=s_to_x(p.station), color='black', lw=D/MM_TO_PT)
+                    ax_table.axhline(y_base, xmin=s_to_x(prev.station), xmax=s_to_x(p.station), color='black', lw=D)
                 
                 ax_table.text(mx, y_base + y_delta*1.2, f"{abs(slope_promille):.1f}‰", 
                               fontproperties=_get_font(5, italic=True), ha='center', va='bottom')
@@ -1249,7 +1249,7 @@ def render_profile_plan(plan: ProfilePlan) -> bytes:
     # Frame & Grid
     ax_frame = fig.add_axes([0, 0, 1, 1])
     ax_frame.set_axis_off(); ax_frame.set_xlim(0, pw_mm); ax_frame.set_ylim(0, ph_mm)
-    frame_rect = Rectangle((MARGIN_LEFT, MARGIN_OTHER), pw_mm-MARGIN_LEFT-MARGIN_OTHER, ph_mm-2*MARGIN_OTHER, fill=False, lw=D_WIDE/MM_TO_PT)
+    frame_rect = Rectangle((MARGIN_LEFT, MARGIN_OTHER), pw_mm-MARGIN_LEFT-MARGIN_OTHER, ph_mm-2*MARGIN_OTHER, fill=False, lw=D_WIDE)
     ax_frame.add_patch(frame_rect)
     _draw_sheet_reference_grid(ax_frame, pw_mm, ph_mm)
     
@@ -1276,12 +1276,12 @@ def render_profile_plan(plan: ProfilePlan) -> bytes:
     
     # 3. Plotting lines
     # Ground profile
-    ax.plot(stations, grounds, color='black', lw=D/MM_TO_PT, zorder=3)
+    ax.plot(stations, grounds, color='black', lw=D, zorder=3)
     
     # Design profile
     if designs:
         d_stations = [p.station for p in plan.points if p.design_z is not None]
-        ax.plot(d_stations, designs, color='red', lw=D_WIDE/MM_TO_PT, zorder=4)
+        ax.plot(d_stations, designs, color='red', lw=D_WIDE, zorder=4)
         
     # Vertical Ordinates (Ordinates)
     # They should drop from points to the bottom of the table
@@ -1289,7 +1289,7 @@ def render_profile_plan(plan: ProfilePlan) -> bytes:
     # Let's draw them in the plot ax but allow clipping to 'off'
     for p in plan.points:
         # Line from ground to bottom of viewport
-        ax.axvline(p.station, color='gray', lw=D/MM_TO_PT/2, linestyle=':', alpha=0.5, zorder=1)
+        ax.axvline(p.station, color='gray', lw=D/2, linestyle=':', alpha=0.5, zorder=1)
     
     ax.grid(True, linestyle=':', alpha=0.3, zorder=0)
     ax.set_title(plan.title, fontproperties=_get_font(10, bold=True))
@@ -1339,13 +1339,15 @@ def _draw_walls(ax, walls: List[Wall]):
         
         # Fill wall (material)
         hatch = _get_hatch(wall.material)
+        # Using facecolor for the base fill
         ax.fill(w_xs, w_ys, color=color if wall.status != 'existing' else 'lightgray', 
-                alpha=0.2 if wall.status == 'existing' else 0.3, zorder=4)
+                alpha=0.15 if wall.status == 'existing' else 0.2, zorder=4)
         if hatch:
+            # Separate fill for hatching with zero linewidth but defined edgecolor
             ax.fill(w_xs, w_ys, fill=False, hatch=hatch, edgecolor=color, linewidth=0, alpha=0.3, zorder=5)
             
         # Draw outline
-        ax.plot(w_xs, w_ys, color=color, linewidth=D_WIDE/MM_TO_PT, linestyle=ls, alpha=alpha, zorder=6)
+        ax.plot(w_xs, w_ys, color=color, linewidth=D_WIDE, linestyle=ls, alpha=alpha, zorder=6)
 
         # Draw Openings (Doors/Windows)
         _draw_openings(ax, wall, p1, p2, dx, dy, length, nx, ny)
@@ -1368,9 +1370,9 @@ def _draw_openings(ax, wall, p1, p2, dx, dy, length, nx, ny):
             ax.fill(*zip(win_c1, win_c2, win_c3, win_c4), color='white', zorder=7)
             
             # Internal window lines
-            ax.plot([ox1, ox2], [oy1, oy2], color='black', lw=D/MM_TO_PT, zorder=8)
-            ax.plot([ox1+nx*0.5, ox2+nx*0.5], [oy1+ny*0.5, oy2+ny*0.5], color='black', lw=D/MM_TO_PT, zorder=8)
-            ax.plot([ox1-nx*0.5, ox2-nx*0.5], [oy1-ny*0.5, oy2-ny*0.5], color='black', lw=D/MM_TO_PT, zorder=8)
+            ax.plot([ox1, ox2], [oy1, oy2], color='black', lw=D, zorder=8)
+            ax.plot([ox1+nx*0.5, ox2+nx*0.5], [oy1+ny*0.5, oy2+ny*0.5], color='black', lw=D, zorder=8)
+            ax.plot([ox1-nx*0.5, ox2-nx*0.5], [oy1-ny*0.5, oy2-ny*0.5], color='black', lw=D, zorder=8)
             
         elif op.type == "door":
             # Door opening arc
@@ -1378,7 +1380,7 @@ def _draw_openings(ax, wall, p1, p2, dx, dy, length, nx, ny):
             dnx, dny = nx / (wall.thickness/2) * op.width, ny / (wall.thickness/2) * op.width
             if op.direction == -1: dnx, dny = -dnx, -dny
             
-            ax.plot([ox1, ox1 + dnx], [oy1, oy1 + dny], color='black', lw=D/MM_TO_PT, zorder=9)
+            ax.plot([ox1, ox1 + dnx], [oy1, oy1 + dny], color='black', lw=D, zorder=9)
             
             # Arc
             angle_wall = math.degrees(math.atan2(dy, dx))
@@ -1387,10 +1389,11 @@ def _draw_openings(ax, wall, p1, p2, dx, dy, length, nx, ny):
             if theta1 > theta2: theta1, theta2 = theta2, theta1
             
             arc = patches.Arc((ox1, oy1), op.width*2, op.width*2, angle=0, 
-                             theta1=theta1, theta2=theta2, color='black', lw=D/MM_TO_PT, zorder=9)
+                             theta1=theta1, theta2=theta2, color='black', lw=D, zorder=9)
             ax.add_patch(arc)
-            # Cover the wall segment
-            ax.fill(*zip((ox1+nx, oy1+ny), (ox2+nx, oy2+ny), (ox2-nx, oy2-ny), (ox1-nx, oy1-ny)), color='white', zorder=7)
+            # Cover the wall segment with white background
+            ax.fill(*zip((ox1+nx, oy1+ny), (ox2+nx, oy2+ny), (ox2-nx, oy2-ny), (ox1-nx, oy1-ny)), 
+                    color='white', edgecolor='none', zorder=7)
 
 def render_interior_plan(plan: InteriorPlan) -> bytes:
     dpi = plan.dpi
@@ -1400,7 +1403,7 @@ def render_interior_plan(plan: InteriorPlan) -> bytes:
     
     ax_frame = fig.add_axes([0, 0, 1, 1]); ax_frame.set_axis_off()
     ax_frame.set_xlim(0, pw_mm); ax_frame.set_ylim(0, ph_mm)
-    ax_frame.add_patch(Rectangle((MARGIN_LEFT, MARGIN_OTHER), pw_mm-MARGIN_LEFT-MARGIN_OTHER, ph_mm-2*MARGIN_OTHER, fill=False, lw=D_WIDE/MM_TO_PT))
+    ax_frame.add_patch(Rectangle((MARGIN_LEFT, MARGIN_OTHER), pw_mm-MARGIN_LEFT-MARGIN_OTHER, ph_mm-2*MARGIN_OTHER, fill=False, lw=D_WIDE))
     _draw_sheet_reference_grid(ax_frame, pw_mm, ph_mm)
     
     # Calculate Axis
@@ -1411,12 +1414,28 @@ def render_interior_plan(plan: InteriorPlan) -> bytes:
     
     all_pts = []
     for w in plan.walls: all_pts.extend([w.start_pt, w.end_pt])
+    if not all_pts:
+        fig.savefig(io.BytesIO(), format='png'); return b''
+        
     xs, ys = [p.x for p in all_pts], [p.y for p in all_pts]
-    cx, cy = (min(xs)+max(xs))/2, (min(ys)+max(ys))/2
+    x_min, x_max, y_min, y_max = min(xs), max(xs), min(ys), max(ys)
+    x_span, y_span = x_max - x_min or 1.0, y_max - y_min or 1.0
+    cx, cy = (x_min+x_max)/2, (y_min+y_max)/2
     
-    m_per_mm = plan.scale / 1000.0
+    # 1. Determine Scale (Support Auto-scale)
+    if plan.scale <= 0:
+        scale_val = _calculate_auto_scale(max(x_span, y_span), min(draw_w_mm, draw_h_mm))
+    else:
+        scale_val = plan.scale
+        # Auto-adjust if units are obviously wrong (e.g. millimeters provided instead of meters)
+        m_per_mm_temp = scale_val / 1000.0
+        if x_span > (draw_w_mm * m_per_mm_temp * 5):
+            scale_val = _calculate_auto_scale(max(x_span, y_span), min(draw_w_mm, draw_h_mm))
+
+    m_per_mm = scale_val / 1000.0
     view_w_m = draw_w_mm * m_per_mm
     view_h_m = draw_h_mm * m_per_mm
+    
     ax.set_xlim(cx - view_w_m/2, cx + view_w_m/2)
     ax.set_ylim(cy - view_h_m/2, cy + view_h_m/2)
     
@@ -1456,7 +1475,7 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     frame_rect = Rectangle((MARGIN_LEFT, MARGIN_OTHER), 
                            pw_mm - MARGIN_LEFT - MARGIN_OTHER, 
                            ph_mm - 2 * MARGIN_OTHER,
-                           fill=False, color='black', linewidth=D_WIDE/MM_TO_PT)
+                           fill=False, color='black', linewidth=D_WIDE)
     ax_frame.add_patch(frame_rect)
     
     # 3. Draw Reference Grid (ISO 5457)

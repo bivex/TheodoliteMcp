@@ -290,7 +290,10 @@ def draw_interior_plan(
 ) -> Image:
     """
     Generates a professional architectural floor plan (PNG).
+    IMPORTANT: All coordinates and dimensions (thickness, width, start_distance) MUST be in METERS.
+    e.g. 500mm = 0.5, 3m = 3.0.
     Supports walls with thickness, door/window openings, and room labels.
+    If scale is set to 0, it will auto-scale to fit the sheet.
     """
     walls = []
     for w in walls_json:
