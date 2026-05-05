@@ -965,7 +965,11 @@ def _draw_stamp(fig, plan: PlotPlan, scale_str: str, pw_mm: float, ph_mm: float,
     ax_stamp.text(0.02, 0.1, texts["draft"], fontproperties=_get_font(6.5, italic=True), va='center')
     ax_stamp.text(0.22, 0.1, plan.title, fontproperties=_get_font(7.5, bold=True), va='center')
 
-def _draw_explication(fig, zones: List[Zone], total_area: float, pw_mm: float, ph_mm: float, lang: str = "ru"):
+def _draw_explication(fig, items: List, total_area: float, pw_mm: float, ph_mm: float, lang: str = "ru"):
+    """
+    Renders an engineering/architectural schedule (Explication).
+    Supports list of Zones or list of Rooms.
+    """
     texts = I18N.get(lang, I18N["ru"])
     # Position: Bottom Left of the inner frame
     width_mm = 85.0
@@ -974,8 +978,8 @@ def _draw_explication(fig, zones: List[Zone], total_area: float, pw_mm: float, p
     title_h = 10.0
     
     # Calculate total table height
-    num_rows = min(len(zones), 15) # Cap for visual space
-    table_h = title_h + header_h + (num_rows + 1) * row_h # +1 for total area row
+    num_items = min(len(items), 15) 
+    table_h = title_h + header_h + (num_items + 1) * row_h 
     
     left_mm = MARGIN_LEFT
     bottom_mm = MARGIN_OTHER
@@ -984,17 +988,17 @@ def _draw_explication(fig, zones: List[Zone], total_area: float, pw_mm: float, p
     ax_leg.set_xticks([]); ax_leg.set_yticks([]); ax_leg.set_facecolor('none')
     for spine in ax_leg.spines.values(): spine.set_linewidth(D)
     
-    # Column widths (relative)
+    # Column widths
     c1, c2, c3 = 0.12, 0.68, 0.2
     
     y = 1.0
-    # Title row
+    # Title
     ax_leg.axhline(y, color='black', lw=D_WIDE)
     ax_leg.text(0.5, y - (title_h/table_h)/2, texts["explication"], 
                 fontproperties=_get_font(8, bold=True), ha='center', va='center')
     y -= (title_h/table_h)
     
-    # Header row
+    # Header
     ax_leg.axhline(y, color='black', lw=D_WIDE)
     h_y = y - (header_h/table_h)/2
     ax_leg.text(c1/2, h_y, texts["num"], fontproperties=_get_font(6.5, bold=True), ha='center', va='center')
@@ -1002,22 +1006,23 @@ def _draw_explication(fig, zones: List[Zone], total_area: float, pw_mm: float, p
     ax_leg.text(c1 + c2 + c3/2, h_y, texts["area_sqm"], fontproperties=_get_font(6.5, bold=True), ha='center', va='center')
     y -= (header_h/table_h)
     
-    # Data rows
-    for i in range(num_rows):
-        zone = zones[i]
-        area = calculate_area(zone.points) or 0
+    # Rows
+    for i in range(num_items):
+        item = items[i]
+        area = calculate_area(item.points) or 0
+        number = getattr(item, 'number', str(i + 1))
         ax_leg.axhline(y, color='black', lw=D)
         row_y = y - (row_h/table_h)/2
-        ax_leg.text(c1/2, row_y, str(i + 1), fontproperties=_get_font(6.5), ha='center', va='center')
-        ax_leg.text(c1 + 0.02, row_y, zone.name[:24], fontproperties=_get_font(6.5), ha='left', va='center')
-        ax_leg.text(c1 + c2 + c3/2, row_y, f'{area:.1f}', fontproperties=_get_font(6.5), ha='center', va='center')
+        ax_leg.text(c1/2, row_y, number, fontproperties=_get_font(6.5), ha='center', va='center')
+        ax_leg.text(c1 + 0.02, row_y, item.name[:24], fontproperties=_get_font(6.5), ha='left', va='center')
+        ax_leg.text(c1 + c2 + c3/2, row_y, f'{area:.2f}', fontproperties=_get_font(6.5), ha='center', va='center')
         y -= (row_h/table_h)
     
-    # Total Area Row
+    # Total
     ax_leg.axhline(y, color='black', lw=D_WIDE)
     row_y = y - (row_h/table_h)/2
     ax_leg.text(c1 + c2/2, row_y, texts["total_area"], fontproperties=_get_font(7, bold=True), ha='center', va='center')
-    ax_leg.text(c1 + c2 + c3/2, row_y, f'{total_area:.1f}', fontproperties=_get_font(7, bold=True), ha='center', va='center')
+    ax_leg.text(c1 + c2 + c3/2, row_y, f'{total_area:.2f}', fontproperties=_get_font(7, bold=True), ha='center', va='center')
     y -= (row_h/table_h)
     ax_leg.axhline(y, color='black', lw=D_WIDE)
     
@@ -1485,14 +1490,13 @@ def render_interior_plan(plan: InteriorPlan) -> bytes:
     
     if plan.furniture:
         _draw_furniture(ax, plan.furniture)
-    
-    for rm in plan.rooms:
-        rx, ry = _centroid(rm.points)
-        area = calculate_area(rm.points) or 0
-        ax.text(rx, ry, f"{rm.number}\n{area:.2f} m²", fontproperties=_get_font(7, bold=True), 
-                ha='center', va='center', bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8, edgecolor='none'))
-    
-    _draw_stamp(fig, plan, f"1:{plan.scale}", pw_mm, ph_mm, lang=plan.language)
+
+    # Calculate Total Area
+    total_area = sum(calculate_area(rm.points) or 0 for rm in plan.rooms)
+    _draw_explication(fig, plan.rooms, total_area, pw_mm, ph_mm, lang=plan.language)
+
+    _draw_stamp(fig, plan, f"1:{scale_val}", pw_mm, ph_mm, lang=plan.language)
+
     
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=dpi, facecolor='white')
