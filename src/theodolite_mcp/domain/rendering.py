@@ -445,7 +445,7 @@ def _draw_stamp(fig, plan: PlotPlan, scale_str: str, lang: str = "ru"):
     ax_stamp.text(0.05, 0.125, texts["date"], **font_p, va='center')
     ax_stamp.text(0.35, 0.125, plan.date, fontsize=7, va='center')
     
-    ax_stamp.axvline(0.55, ymin=0, ymax=0.25, color='black', lw=D/MM_TO_PT)
+    ax_stamp.axvline(0.55, ymin=0, ymax=0.25, color='black', lw=D)
     ax_stamp.text(0.57, 0.125, texts["scale"], **font_p, va='center')
     ax_stamp.text(0.75, 0.125, scale_str, **font_b, va='center')
 
@@ -479,7 +479,7 @@ def _draw_north_arrow(ax, lang: str = "ru"):
     # Position fixed relative to axis viewport
     x, y = xlim[0] + (xlim[1] - xlim[0]) * 0.05, ylim[1] - (ylim[1] - ylim[0]) * 0.12
     arrow_len = (ylim[1] - ylim[0]) * 0.08
-    ax.annotate('', xy=(x, y + arrow_len), xytext=(x, y), arrowprops=dict(arrowstyle='fancy', color='black', linewidth=D_SYMBOL/MM_TO_PT))
+    ax.annotate('', xy=(x, y + arrow_len), xytext=(x, y), arrowprops=dict(arrowstyle='fancy', color='black', linewidth=D_SYMBOL))
     ax.text(x, y + arrow_len + arrow_len*0.25, texts["north"], fontsize=10.5, fontweight='bold', ha='center')
 
 def render_plot_plan(plan: PlotPlan) -> bytes:
@@ -541,3 +541,4 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     fig.savefig(buf, format='png', dpi=dpi, facecolor='white')
     buf.seek(0)
     return buf.getvalue()
+
