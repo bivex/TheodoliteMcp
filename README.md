@@ -2,20 +2,34 @@
 
 A professional-grade MCP server for processing theodolite survey field books, traverse adjustments, and **ISO-compliant** technical drawing generation.
 
-![Construction Site Plan](construction_site_plan.png)
+![Construction Site Plan](docs/gallery/construction_site_plan.png)
 *Example: ISO-compliant plot plan generated automatically from survey data.*
+
+---
 
 ## 🌟 Core Features
 
-- **Precision Surveying:** Automated angular and linear misclosure adjustment using the Compass Rule.
+- **Precision Surveying:** Automated angular and linear misclosure adjustment using the Compass Rule (Bowditch).
 - **ISO Standard Rendering:** Generates professional technical drawings (PNG/PDF) following strict international standards:
-    - **ISO 5457:** Standard paper formats (A0-A4) with precise 20mm/10mm margins.
-    - **ISO 7200:** Non-proportional title blocks (stamps) with absolute dimensions.
-    - **ISO 3098:** Technical lettering using the specialized `osifont`.
+    - **ISO 5457:** Standard paper formats (A0-A4) with precise 20mm/10mm margins and reference grids.
+    - **ISO 7200:** Absolute-dimension title blocks (stamps) for professional identification.
+    - **ISO 3098:** Technical lettering using the specialized `osifont` for engineering clarity.
     - **ISO 5455:** Strict engineering scales (1:50, 1:100, 1:500, etc.).
-    - **ISO 129-1:** Smart dimensioning with automatic leaders for tight spaces.
+    - **ISO 129-1:** Smart dimensioning with automatic leader placement for tight spaces.
+    - **ISO 128-50:** Standardized material hatching (Concrete, Brick, Metal, Soil, etc.).
+- **Global Reach:** Full support for **23 languages**, covering most of Europe and major global markets.
 - **Geodesic Logic:** Area calculation (Gauss formula), Azimuth calculations, and DMS/Decimal conversions.
-- **Validation:** Automatic precision checks against industrial standards (1:2000, 1:5000).
+
+---
+
+## 📂 Project Structure
+
+- `src/theodolite_mcp/` - Core application logic and MCP server infrastructure.
+- `examples/` - Demonstration scripts for various use cases (Construction, Cadastral, Shipbuilding, etc.).
+- `docs/gallery/` - Examples of generated ISO-compliant plans.
+- `tests/` - Unit and integration tests to ensure computation and rendering accuracy.
+
+---
 
 ## 🚀 Quick Start
 
@@ -31,40 +45,43 @@ cd theodolite-mcp
 pip install .
 ```
 
-### 2. Run Demos
-Experience the full pipeline from raw measurements to a finished technical drawing:
+### 2. Experience the Demos
+Run our showcase examples to see the rendering engine in action:
 
 ```bash
-# Generate a professional construction site plan
-PYTHONPATH=src python3 demo_construction.py
+# Generate a professional construction site plan (A3)
+PYTHONPATH=src python3 examples/demo_construction.py
+
+# Generate the "Dream City" material showcase (A2)
+PYTHONPATH=src python3 examples/demo_dream_city.py
 
 # Run a full traverse adjustment task
-PYTHONPATH=src python3 demo_task.py
+PYTHONPATH=src python3 examples/demo_task.py
 ```
+*Results will be saved in the root or specified output directory.*
+
+---
 
 ## 🛠 Available Tools
 
 ### 🖋 Rendering & Visualization
-- **`draw_plot_plan`**: The flagship tool. Generates an ISO-compliant technical drawing (PNG) from survey data. Supports standard formats (A0-A4), **23 languages** (EN, RU, UK, DE, FR, ES, IT, PT, PL, TR, ZH, JA, KO, NL, SV, NO, DA, FI, EL, CS, HU, RO, BG), and professional styles (Construction/Shipbuilding).
+- **`draw_plot_plan`**: Generates an ISO-compliant technical drawing. Supports standard formats (A0-A4), 23 languages, and professional styles.
 
-### 📐 Survey Computation (Traverse)
-- **`adjust_traverse_network`**: Performs a full Bowditch (Compass Rule) adjustment. Calculates coordinates from angles and distances, handles angular/linear misclosure, and generates a detailed Markdown report. Supports sea-level and grid scale corrections.
-- **`reduce_stadia_readings`**: Tacheometric reduction. Computes horizontal distance and vertical elevation from top/bottom hair readings and vertical angles.
-- **`compute_parcel_area`**: Calculates the precise area of a land plot or zone using the Gauss polygon formula.
+### 📐 Survey Computation
+- **`adjust_traverse_network`**: Performs Bowditch adjustment, handles misclosures, and generates Markdown reports.
+- **`reduce_stadia_readings`**: Tacheometric reduction from stadia hair readings.
+- **`compute_parcel_area`**: Precise area calculation using the Gauss polygon formula.
 
-### 🧭 Geodesic Utilities
-- **`compute_inverse_geodetic_problem`**: Calculates the distance and azimuth between two known points (Inverse problem).
-- **`compute_forward_azimuth`**: Calculates the bearing from one point to another.
-- **`compute_back_azimuth`**: Calculates the reverse bearing (Back azimuth).
-- **`compute_edm_atmospheric_correction`**: Calculates PPM correction for Electronic Distance Measurement (EDM) based on temperature and pressure.
+### 🧭 Geodesic Utilities & Conversions
+- **`compute_inverse_geodetic_problem`**: Distance/Azimuth between two points.
+- **`compute_forward_azimuth`** / **`compute_back_azimuth`**: Bearing calculations.
+- **`dms_to_decimal_degrees`** / **`decimal_degrees_to_dms`**: Precise coordinate conversions.
 
-### 🔢 Conversions
-- **`dms_to_decimal_degrees`**: Converts traditional survey measurements (Degrees, Minutes, Seconds) to decimal format.
-- **`decimal_degrees_to_dms`**: Converts decimal degrees back to a precise DMS structure.
+---
 
 ## 📐 Industrial Compliance
 
-This server is designed for professionals. Unlike generic plotting libraries, our rendering engine ensures that every line weight, font height, and margin meets **ISO Technical Documentation** requirements, making outputs suitable for official site plans and engineering reports.
+This server is designed for engineering professionals. Unlike generic plotting libraries, our rendering engine ensures that every line weight, font height, and margin meets **ISO Technical Documentation** requirements, making outputs suitable for official site plans, blueprints, and engineering reports.
 
 ## 📄 License
-This project is licensed under the MIT License - see the LICENSE file for details. Technical font `osifont` is licensed under GNU LGPL.
+This project is licensed under the MIT License. Technical font `osifont` is licensed under GNU LGPL.
