@@ -144,6 +144,7 @@ def draw_plot_plan(
     show_areas: bool = True,
     show_north_arrow: bool = True,
     show_scale_bar: bool = True,
+    coordinate_labels: bool = False,
     width: float = 10.0,
     height: float = 10.0,
     dpi: int = 150,

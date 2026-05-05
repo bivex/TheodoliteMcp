@@ -18,11 +18,12 @@ def decimal_to_dms(decimal: float):
     return sign * degrees, minutes, seconds
 
 def calculate_azimuth_from_points(p1: Point, p2: Point) -> float:
-    dx = p2.x - p1.x
-    dy = p2.y - p1.y
+    dx = p2.x - p1.x # East
+    dy = p2.y - p1.y # North
     if abs(dx) < 1e-10 and abs(dy) < 1e-10:
         raise ValueError("Points are identical; azimuth is undefined.")
-    azimuth = math.degrees(math.atan2(dy, dx))
+    # In surveying, Azimuth = atan2(East, North)
+    azimuth = math.degrees(math.atan2(dx, dy))
     return normalize_angle(azimuth)
 
 def calculate_area(points: List[Point]) -> float:
@@ -158,8 +159,10 @@ def calculate_traverse(data: TraverseData) -> TraverseResult:
         azimuths.append(current_az)
 
     # 3. Calculate Increments for main traverse
-    dxs = [obs.distance * math.cos(math.radians(az)) for obs, az in zip(traverse_obs, azimuths)]
-    dys = [obs.distance * math.sin(math.radians(az)) for obs, az in zip(traverse_obs, azimuths)]
+    # Surveying convention: North = 0 deg (Y axis), East = 90 deg (X axis)
+    # dy (North) = dist * cos(az), dx (East) = dist * sin(az)
+    dxs = [obs.distance * math.sin(math.radians(az)) for obs, az in zip(traverse_obs, azimuths)]
+    dys = [obs.distance * math.cos(math.radians(az)) for obs, az in zip(traverse_obs, azimuths)]
 
     # 4. Linear Misclosure
     sum_dx, sum_dy = sum(dxs), sum(dys)
