@@ -1458,11 +1458,14 @@ def render_interior_plan(plan: InteriorPlan) -> bytes:
     draw_h_mm = ph_mm - 2 * MARGIN_OTHER - STAMP_HEIGHT - 10
     ax = fig.add_axes([(MARGIN_LEFT+10)/pw_mm, (MARGIN_OTHER+STAMP_HEIGHT+5)/ph_mm, draw_w_mm/pw_mm, draw_h_mm/ph_mm])
     ax.set_aspect('equal')
-    
+    # Bounds
     all_pts = []
     for w in plan.walls: all_pts.extend([w.start_pt, w.end_pt])
+    for rm in plan.rooms: all_pts.extend(rm.points)
+
     if not all_pts:
         fig.savefig(io.BytesIO(), format='png'); return b''
+
         
     xs, ys = [p.x for p in all_pts], [p.y for p in all_pts]
     x_min, x_max, y_min, y_max = min(xs), max(xs), min(ys), max(ys)
@@ -1490,6 +1493,15 @@ def render_interior_plan(plan: InteriorPlan) -> bytes:
     
     if plan.furniture:
         _draw_furniture(ax, plan.furniture)
+    
+    # 3.2 Draw Room Labels (Number and Area)
+    for rm in plan.rooms:
+        if rm.points:
+            rx, ry = _centroid(rm.points)
+            area = calculate_area(rm.points) or 0
+            ax.text(rx, ry, f"{rm.number}\n{area:.2f} m²", fontproperties=_get_font(7, bold=True), 
+                    ha='center', va='center', zorder=10,
+                    bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.7, edgecolor='none'))
 
     # Calculate Total Area
     total_area = sum(calculate_area(rm.points) or 0 for rm in plan.rooms)
