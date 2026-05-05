@@ -283,7 +283,7 @@ def _draw_vertex_labels(ax, points: List[Point], fontsize: float = 8, standard: 
         dist = math.hypot(dx, dy)
         
         # Default offset
-        off_val = 2.0
+        off_val = 3.5
         vx, vy = (dx / dist * off_val, dy / dist * off_val) if dist > 0 else (off_val, off_val)
         
         # Check if this position is too close to any previously used position
