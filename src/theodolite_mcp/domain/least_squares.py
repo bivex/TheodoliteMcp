@@ -108,19 +108,24 @@ def adjust_network_2d(observations: List[ObservationLS], initial_coords: Dict[st
         if max_correction < 1e-5: # Convergence
             # Error analysis
             v = A @ dx_vec - L
-            sigma0_2 = (v.T @ P @ v) / (len(L) - 2 * n_free)
-            Qxx = np.linalg.inv(AtPA)
-            std_devs = {}
-            for i, name in enumerate(free_pts):
-                std_devs[name] = {
-                    'x': math.sqrt(Qxx[2*i, 2*i] * sigma0_2),
-                    'y': math.sqrt(Qxx[2*i+1, 2*i+1] * sigma0_2)
-                }
-            return LSAResult(
-                adjusted_coordinates=curr_coords, 
-                standard_deviations=std_devs, 
-                unit_weight_variance=float(sigma0_2),
-                iterations=iter_idx + 1
-            )
+            dof = len(L) - 2 * n_free
+            sigma0_2 = (v.T @ P @ v) / dof if dof > 0 else 1.0
+            
+            try:
+                Qxx = np.linalg.inv(AtPA)
+                std_devs = {}
+                for i, name in enumerate(free_pts):
+                    std_devs[name] = {
+                        'x': math.sqrt(abs(Qxx[2*i, 2*i] * sigma0_2)),
+                        'y': math.sqrt(abs(Qxx[2*i+1, 2*i+1] * sigma0_2))
+                    }
+                return LSAResult(
+                    adjusted_coordinates=curr_coords, 
+                    standard_deviations=std_devs, 
+                    unit_weight_variance=float(sigma0_2),
+                    iterations=iter_idx + 1
+                )
+            except np.linalg.LinAlgError:
+                return LSAResult(adjusted_coordinates=curr_coords, standard_deviations={}, unit_weight_variance=float(sigma0_2), iterations=iter_idx + 1)
             
     return LSAResult(adjusted_coordinates=curr_coords, standard_deviations={}, unit_weight_variance=0.0, iterations=max_iters)
