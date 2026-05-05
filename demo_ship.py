@@ -43,10 +43,10 @@ def create_ship_demo():
         zones=zones,
         standard="shipbuilding",
         language="en",
+        paper_format="A4",
+        orientation="landscape",
         show_azimuths=False,
         show_scale_bar=True,
-        width_inches=12,
-        height_inches=8
     )
     
     png_bytes = render_plot_plan(plan)

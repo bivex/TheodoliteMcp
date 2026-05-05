@@ -39,6 +39,8 @@ def create_cadastral_demo():
         zones=zones,
         language="en",
         standard="construction", # Using construction styles as baseline for land survey
+        paper_format="A3",
+        orientation="landscape",
         show_vertex_labels=True,
         show_distances=True,
         show_azimuths=True,
