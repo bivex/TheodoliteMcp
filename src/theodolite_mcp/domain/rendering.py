@@ -1512,8 +1512,8 @@ def render_interior_plan(plan: InteriorPlan) -> bytes:
     
     _draw_walls(ax, plan.walls)
     
-    if plan.furniture:
-        _draw_furniture(ax, plan.furniture)
+    # if plan.furniture:
+    #     _draw_furniture(ax, plan.furniture)
     
     # 3.2 Draw Room Labels (Number and Area)
     for rm in plan.rooms:
