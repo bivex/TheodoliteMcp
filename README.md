@@ -25,7 +25,7 @@ Ensure you have Python 3.10+ installed.
 ```bash
 # Clone the repository
 git clone https://github.com/your-repo/theodolite-mcp.git
-cd theodolite_mcp
+cd theodolite-mcp
 
 # Install dependencies
 pip install .
@@ -44,12 +44,23 @@ PYTHONPATH=src python3 demo_task.py
 
 ## 🛠 Available Tools
 
-| Tool | Description |
-| :--- | :--- |
-| `render_plot_plan` | Generates an ISO-compliant technical drawing from points and zones. |
-| `process_traverse` | Calculates adjusted coordinates from survey observations. |
-| `calculate_azimuth` | Calculates the bearing between two coordinate points. |
-| `convert_dms_to_decimal`| Converts Degrees-Minutes-Seconds to Decimal Degrees. |
+### 🖋 Rendering & Visualization
+- **`draw_plot_plan`**: The flagship tool. Generates an ISO-compliant technical drawing (PNG) from survey data. Supports standard formats (A0-A4), multiple languages (RU/UK/EN), and professional styles (Construction/Shipbuilding).
+
+### 📐 Survey Computation (Traverse)
+- **`adjust_traverse_network`**: Performs a full Bowditch (Compass Rule) adjustment. Calculates coordinates from angles and distances, handles angular/linear misclosure, and generates a detailed Markdown report. Supports sea-level and grid scale corrections.
+- **`reduce_stadia_readings`**: Tacheometric reduction. Computes horizontal distance and vertical elevation from top/bottom hair readings and vertical angles.
+- **`compute_parcel_area`**: Calculates the precise area of a land plot or zone using the Gauss polygon formula.
+
+### 🧭 Geodesic Utilities
+- **`compute_inverse_geodetic_problem`**: Calculates the distance and azimuth between two known points (Inverse problem).
+- **`compute_forward_azimuth`**: Calculates the bearing from one point to another.
+- **`compute_back_azimuth`**: Calculates the reverse bearing (Back azimuth).
+- **`compute_edm_atmospheric_correction`**: Calculates PPM correction for Electronic Distance Measurement (EDM) based on temperature and pressure.
+
+### 🔢 Conversions
+- **`dms_to_decimal_degrees`**: Converts traditional survey measurements (Degrees, Minutes, Seconds) to decimal format.
+- **`decimal_degrees_to_dms`**: Converts decimal degrees back to a precise DMS structure.
 
 ## 📐 Industrial Compliance
 
