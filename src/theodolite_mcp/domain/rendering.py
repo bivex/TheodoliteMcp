@@ -1013,9 +1013,14 @@ def _draw_explication(fig, items: List, total_area: float, pw_mm: float, ph_mm: 
         number = getattr(item, 'number', str(i + 1))
         ax_leg.axhline(y, color='black', lw=D)
         row_y = y - (row_h/table_h)/2
-        ax_leg.text(c1/2, row_y, number, fontproperties=_get_font(6.5), ha='center', va='center')
-        ax_leg.text(c1 + 0.02, row_y, item.name[:24], fontproperties=_get_font(6.5), ha='left', va='center')
-        ax_leg.text(c1 + c2 + c3/2, row_y, f'{area:.2f}', fontproperties=_get_font(6.5), ha='center', va='center')
+        
+        if i == 14 and len(items) > 15:
+            # Last visible row shows "others"
+            ax_leg.text(0.5, row_y, texts["others"], fontproperties=_get_font(6, italic=True), ha='center', va='center')
+        else:
+            ax_leg.text(c1/2, row_y, number, fontproperties=_get_font(6.5), ha='center', va='center')
+            ax_leg.text(c1 + 0.02, row_y, item.name[:24], fontproperties=_get_font(6.5), ha='left', va='center')
+            ax_leg.text(c1 + c2 + c3/2, row_y, f'{area:.2f}', fontproperties=_get_font(6.5), ha='center', va='center')
         y -= (row_h/table_h)
     
     # Total
