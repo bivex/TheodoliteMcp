@@ -1,6 +1,6 @@
 from mcp.server.fastmcp import FastMCP, Image
 from pydantic import Field
-from typing import Optional, Union, Dict, Any
+from typing import Annotated, Optional, Dict
 import os
 from theodolite_mcp.domain.models import (
     TraverseData,
@@ -42,9 +42,9 @@ service = SurveyService()
 
 @mcp.tool()
 def dms_to_decimal_degrees(
-    degrees: int = Field(description="Degrees component (0-360)"),
-    minutes: int = Field(description="Minutes component (0-59)"),
-    seconds: float = Field(description="Seconds component (0-59.999...)"),
+    degrees: Annotated[int, Field(description="Degrees component (0-360)")],
+    minutes: Annotated[int, Field(description="Minutes component (0-59)")],
+    seconds: Annotated[float, Field(description="Seconds component (0-59.999...)")],
 ) -> float:
     """Converts Degrees, Minutes, Seconds to decimal degrees."""
     return dms_to_decimal(degrees, minutes, seconds)
@@ -52,7 +52,9 @@ def dms_to_decimal_degrees(
 
 @mcp.tool()
 def decimal_degrees_to_dms(
-    decimal: float = Field(description="Angle in decimal degrees (e.g., 123.4567)"),
+    decimal: Annotated[
+        float, Field(description="Angle in decimal degrees (e.g., 123.4567)")
+    ],
 ) -> dict:
     """Converts decimal degrees to Degrees, Minutes, Seconds."""
     d, m, s = decimal_to_dms(decimal)
@@ -61,10 +63,10 @@ def decimal_degrees_to_dms(
 
 @mcp.tool()
 def compute_forward_azimuth(
-    x1: float = Field(description="X coordinate of start point"),
-    y1: float = Field(description="Y coordinate of start point"),
-    x2: float = Field(description="X coordinate of end point"),
-    y2: float = Field(description="Y coordinate of end point"),
+    x1: Annotated[float, Field(description="X coordinate of start point")],
+    y1: Annotated[float, Field(description="Y coordinate of start point")],
+    x2: Annotated[float, Field(description="X coordinate of end point")],
+    y2: Annotated[float, Field(description="Y coordinate of end point")],
 ) -> float:
     """Calculates the forward azimuth (bearing) from point 1 to point 2."""
     p1 = Point(name="P1", x=x1, y=y1)
@@ -74,7 +76,7 @@ def compute_forward_azimuth(
 
 @mcp.tool()
 def compute_back_azimuth(
-    azimuth: float = Field(description="Forward azimuth in decimal degrees"),
+    azimuth: Annotated[float, Field(description="Forward azimuth in decimal degrees")],
 ) -> float:
     """Calculates the back azimuth (reverse bearing)."""
     return normalize_angle(azimuth + 180.0)
@@ -82,16 +84,22 @@ def compute_back_azimuth(
 
 @mcp.tool()
 def compute_inverse_geodetic_problem(
-    x1: float = Field(description="X coordinate of point 1"),
-    y1: float = Field(description="Y coordinate of point 1"),
-    x2: float = Field(description="X coordinate of point 2"),
-    y2: float = Field(description="Y coordinate of point 2"),
-    z1: Optional[float] = Field(
-        default=None, description="Z coordinate (elevation) of point 1, optional"
-    ),
-    z2: Optional[float] = Field(
-        default=None, description="Z coordinate (elevation) of point 2, optional"
-    ),
+    x1: Annotated[float, Field(description="X coordinate of point 1")],
+    y1: Annotated[float, Field(description="Y coordinate of point 1")],
+    x2: Annotated[float, Field(description="X coordinate of point 2")],
+    y2: Annotated[float, Field(description="Y coordinate of point 2")],
+    z1: Annotated[
+        Optional[float],
+        Field(
+            default=None, description="Z coordinate (elevation) of point 1, optional"
+        ),
+    ] = None,
+    z2: Annotated[
+        Optional[float],
+        Field(
+            default=None, description="Z coordinate (elevation) of point 2, optional"
+        ),
+    ] = None,
 ) -> dict:
     """
     Solves the inverse geodetic problem: calculates azimuth, horizontal distance,
@@ -104,11 +112,15 @@ def compute_inverse_geodetic_problem(
 
 @mcp.tool()
 def reduce_stadia_readings(
-    top_hair: float = Field(description="Top stadia hair reading"),
-    bottom_hair: float = Field(description="Bottom stadia hair reading"),
-    vertical_angle: float = Field(description="Vertical angle in degrees"),
-    hi: float = Field(default=0.0, description="Instrument height above ground"),
-    ht: float = Field(default=0.0, description="Target height above ground"),
+    top_hair: Annotated[float, Field(description="Top stadia hair reading")],
+    bottom_hair: Annotated[float, Field(description="Bottom stadia hair reading")],
+    vertical_angle: Annotated[float, Field(description="Vertical angle in degrees")],
+    hi: Annotated[
+        float, Field(default=0.0, description="Instrument height above ground")
+    ] = 0.0,
+    ht: Annotated[
+        float, Field(default=0.0, description="Target height above ground")
+    ] = 0.0,
 ) -> dict:
     """
     Tacheometric reduction: computes horizontal distance and elevation from stadia readings.
@@ -125,9 +137,12 @@ def reduce_stadia_readings(
 
 @mcp.tool()
 def compute_parcel_area(
-    points_json: list[dict] = Field(
-        description="List of polygon vertices as {x: float, y: float} dictionaries"
-    ),
+    points_json: Annotated[
+        list[dict],
+        Field(
+            description="List of polygon vertices as {x: float, y: float} dictionaries"
+        ),
+    ],
 ) -> float:
     """Calculates the area of a polygon from a list of coordinates (x, y)."""
     points = [Point(**pt) for pt in points_json]
@@ -136,11 +151,14 @@ def compute_parcel_area(
 
 @mcp.tool()
 def compute_edm_atmospheric_correction(
-    temp_c: float = Field(description="Air temperature in Celsius"),
-    pressure_hpa: float = Field(description="Atmospheric pressure in hPa (millibars)"),
-    freq_const: float = Field(
-        default=281.8, description="EDM frequency constant (default: 281.8)"
-    ),
+    temp_c: Annotated[float, Field(description="Air temperature in Celsius")],
+    pressure_hpa: Annotated[
+        float, Field(description="Atmospheric pressure in hPa (millibars)")
+    ],
+    freq_const: Annotated[
+        float,
+        Field(default=281.8, description="EDM frequency constant (default: 281.8)"),
+    ] = 281.8,
 ) -> float:
     """
     Calculates the atmospheric PPM (Parts Per Million) correction for EDM measurements.
@@ -153,42 +171,71 @@ def compute_edm_atmospheric_correction(
 
 @mcp.tool()
 def adjust_traverse_network(
-    start_x: float = Field(description="X coordinate of traverse start point"),
-    start_y: float = Field(description="Y coordinate of traverse start point"),
-    start_z: Optional[float] = Field(
-        default=None, description="Z coordinate (elevation) of start point, optional"
-    ),
-    start_name: str = Field(default="P1", description="Label/name for the start point"),
-    start_azimuth: float = Field(
-        default=0.0, description="Known starting azimuth direction (degrees)"
-    ),
-    closing_azimuth: Optional[float] = Field(
-        default=None, description="Known closing azimuth for closed traverse, optional"
-    ),
-    observations_json: list[dict] = Field(
-        default=[], description="List of traverse observations (angles, distances)"
-    ),
-    is_closed: bool = Field(
-        default=False, description="Whether the traverse is a closed loop"
-    ),
-    avg_elevation: float = Field(
-        default=0.0, description="Average elevation for geodetic corrections"
-    ),
-    grid_scale_factor: float = Field(
-        default=1.0, description="Grid scale factor for projection corrections"
-    ),
-    end_x: Optional[float] = Field(
-        default=None, description="X coordinate of known end point for open traverse"
-    ),
-    end_y: Optional[float] = Field(
-        default=None, description="Y coordinate of known end point for open traverse"
-    ),
-    end_name: Optional[str] = Field(
-        default=None, description="Label/name for the end point"
-    ),
-    generate_report: bool = Field(
-        default=True, description="Include markdown adjustment report in output"
-    ),
+    start_x: Annotated[
+        float, Field(description="X coordinate of traverse start point")
+    ],
+    start_y: Annotated[
+        float, Field(description="Y coordinate of traverse start point")
+    ],
+    start_z: Annotated[
+        Optional[float],
+        Field(
+            default=None,
+            description="Z coordinate (elevation) of start point, optional",
+        ),
+    ] = None,
+    start_name: Annotated[
+        str, Field(default="P1", description="Label/name for the start point")
+    ] = "P1",
+    start_azimuth: Annotated[
+        float,
+        Field(default=0.0, description="Known starting azimuth direction (degrees)"),
+    ] = 0.0,
+    closing_azimuth: Annotated[
+        Optional[float],
+        Field(
+            default=None,
+            description="Known closing azimuth for closed traverse, optional",
+        ),
+    ] = None,
+    observations_json: Annotated[
+        list[dict],
+        Field(
+            default=[], description="List of traverse observations (angles, distances)"
+        ),
+    ] = [],
+    is_closed: Annotated[
+        bool, Field(default=False, description="Whether the traverse is a closed loop")
+    ] = False,
+    avg_elevation: Annotated[
+        float,
+        Field(default=0.0, description="Average elevation for geodetic corrections"),
+    ] = 0.0,
+    grid_scale_factor: Annotated[
+        float,
+        Field(default=1.0, description="Grid scale factor for projection corrections"),
+    ] = 1.0,
+    end_x: Annotated[
+        Optional[float],
+        Field(
+            default=None,
+            description="X coordinate of known end point for open traverse",
+        ),
+    ] = None,
+    end_y: Annotated[
+        Optional[float],
+        Field(
+            default=None,
+            description="Y coordinate of known end point for open traverse",
+        ),
+    ] = None,
+    end_name: Annotated[
+        Optional[str], Field(default=None, description="Label/name for the end point")
+    ] = None,
+    generate_report: Annotated[
+        bool,
+        Field(default=True, description="Include markdown adjustment report in output"),
+    ] = True,
 ) -> dict:
     """
     Performs Bowditch (Compass Rule) adjustment on a traverse network with geodetic corrections.
@@ -223,49 +270,77 @@ def adjust_traverse_network(
 
 @mcp.tool()
 def draw_plot_plan(
-    title: str = Field(
-        default="Cadastral Plan", description="Plan title displayed on the drawing"
-    ),
-    boundary_json: list[dict] = Field(
-        default=[],
-        description="List of boundary vertices as {x: float, y: float} dicts",
-    ),
-    zones_json: list[dict] = Field(
-        default=[],
-        description="List of zone definitions with name, points, and styling",
-    ),
-    language: str = Field(
-        default="ru", description="Drawing language: 'ru' (Russian) or 'en' (English)"
-    ),
-    standard: str = Field(
-        default="construction",
-        description="Drawing standard: 'construction' (ISO 128-23) or 'shipbuilding' (ISO 129-4)",
-    ),
-    show_vertex_labels: bool = Field(
-        default=True, description="Display vertex point labels (P1, P2, ...)"
-    ),
-    show_distances: bool = Field(
-        default=True, description="Display distance labels on boundary edges"
-    ),
-    show_azimuths: bool = Field(
-        default=True, description="Display azimuth/direction labels"
-    ),
-    show_areas: bool = Field(
-        default=True, description="Display computed area for each zone"
-    ),
-    show_north_arrow: bool = Field(
-        default=True, description="Display north arrow indicator"
-    ),
-    show_scale_bar: bool = Field(default=True, description="Display scale bar"),
-    coordinate_labels: bool = Field(
-        default=False, description="Display numeric coordinates at each vertex"
-    ),
-    width: float = Field(default=10.0, description="Plan width in inches"),
-    height: float = Field(default=10.0, description="Plan height in inches"),
-    dpi: int = Field(default=150, description="Image resolution in dots per inch"),
-    output_path: Optional[str] = Field(
-        default=None, description="Optional file path to save PNG output"
-    ),
+    title: Annotated[
+        str,
+        Field(
+            default="Cadastral Plan", description="Plan title displayed on the drawing"
+        ),
+    ] = "Cadastral Plan",
+    boundary_json: Annotated[
+        list[dict],
+        Field(
+            default=[],
+            description="List of boundary vertices as {x: float, y: float} dicts",
+        ),
+    ] = [],
+    zones_json: Annotated[
+        list[dict],
+        Field(
+            default=[],
+            description="List of zone definitions with name, points, and styling",
+        ),
+    ] = [],
+    language: Annotated[
+        str,
+        Field(
+            default="ru",
+            description="Drawing language: 'ru' (Russian) or 'en' (English)",
+        ),
+    ] = "ru",
+    standard: Annotated[
+        str,
+        Field(
+            default="construction",
+            description="Drawing standard: 'construction' (ISO 128-23) or 'shipbuilding' (ISO 129-4)",
+        ),
+    ] = "construction",
+    show_vertex_labels: Annotated[
+        bool,
+        Field(default=True, description="Display vertex point labels (P1, P2, ...)"),
+    ] = True,
+    show_distances: Annotated[
+        bool,
+        Field(default=True, description="Display distance labels on boundary edges"),
+    ] = True,
+    show_azimuths: Annotated[
+        bool, Field(default=True, description="Display azimuth/direction labels")
+    ] = True,
+    show_areas: Annotated[
+        bool, Field(default=True, description="Display computed area for each zone")
+    ] = True,
+    show_north_arrow: Annotated[
+        bool, Field(default=True, description="Display north arrow indicator")
+    ] = True,
+    show_scale_bar: Annotated[
+        bool, Field(default=True, description="Display scale bar")
+    ] = True,
+    coordinate_labels: Annotated[
+        bool,
+        Field(default=False, description="Display numeric coordinates at each vertex"),
+    ] = False,
+    width: Annotated[
+        float, Field(default=10.0, description="Plan width in inches")
+    ] = 10.0,
+    height: Annotated[
+        float, Field(default=10.0, description="Plan height in inches")
+    ] = 10.0,
+    dpi: Annotated[
+        int, Field(default=150, description="Image resolution in dots per inch")
+    ] = 150,
+    output_path: Annotated[
+        Optional[str],
+        Field(default=None, description="Optional file path to save PNG output"),
+    ] = None,
 ) -> Image:
     """
     Generate a visual cadastral/site plan showing land plot boundaries,
@@ -309,24 +384,37 @@ def draw_plot_plan(
 
 @mcp.tool()
 def export_to_dxf(
-    title: str = Field(
-        default="Cadastral Plan", description="Plan title stored in DXF metadata"
-    ),
-    boundary_json: list[dict] = Field(
-        default=[],
-        description="List of boundary vertices as {x: float, y: float} dicts",
-    ),
-    zones_json: list[dict] = Field(
-        default=[],
-        description="List of zone definitions with name, points, and styling",
-    ),
-    filename: str = Field(
-        default="exported_plan.dxf",
-        description="Output DXF filename (saved in 'output/' directory)",
-    ),
-    coordinate_labels: bool = Field(
-        default=False, description="Add coordinate text labels to each vertex"
-    ),
+    title: Annotated[
+        str,
+        Field(
+            default="Cadastral Plan", description="Plan title stored in DXF metadata"
+        ),
+    ] = "Cadastral Plan",
+    boundary_json: Annotated[
+        list[dict],
+        Field(
+            default=[],
+            description="List of boundary vertices as {x: float, y: float} dicts",
+        ),
+    ] = [],
+    zones_json: Annotated[
+        list[dict],
+        Field(
+            default=[],
+            description="List of zone definitions with name, points, and styling",
+        ),
+    ] = [],
+    filename: Annotated[
+        str,
+        Field(
+            default="exported_plan.dxf",
+            description="Output DXF filename (saved in 'output/' directory)",
+        ),
+    ] = "exported_plan.dxf",
+    coordinate_labels: Annotated[
+        bool,
+        Field(default=False, description="Add coordinate text labels to each vertex"),
+    ] = False,
 ) -> str:
     """
     Exports a cadastral/site plan to a professional DXF file for AutoCAD/Civil 3D.
@@ -361,23 +449,32 @@ def export_to_dxf(
 
 @mcp.tool()
 def draw_longitudinal_profile(
-    title: str = Field(default="Longitudinal Profile", description="Profile title"),
-    points_json: list[dict] = Field(
-        default=[],
-        description="List of profile points with station, elevation, and optional design data",
-    ),
-    language: str = Field(
-        default="ru", description="Drawing language: 'ru' (Russian) or 'en' (English)"
-    ),
-    paper_format: str = Field(
-        default="A3", description="Paper size: A0, A1, A2, A3, A4, etc."
-    ),
-    h_scale: int = Field(
-        default=1000, description="Horizontal scale (e.g., 1000 for 1:1000)"
-    ),
-    v_scale: int = Field(
-        default=100, description="Vertical scale (e.g., 100 for 1:100)"
-    ),
+    title: Annotated[
+        str, Field(default="Longitudinal Profile", description="Profile title")
+    ] = "Longitudinal Profile",
+    points_json: Annotated[
+        list[dict],
+        Field(
+            default=[],
+            description="List of profile points with station, elevation, and optional design data",
+        ),
+    ] = [],
+    language: Annotated[
+        str,
+        Field(
+            default="ru",
+            description="Drawing language: 'ru' (Russian) or 'en' (English)",
+        ),
+    ] = "ru",
+    paper_format: Annotated[
+        str, Field(default="A3", description="Paper size: A0, A1, A2, A3, A4, etc.")
+    ] = "A3",
+    h_scale: Annotated[
+        int, Field(default=1000, description="Horizontal scale (e.g., 1000 for 1:1000)")
+    ] = 1000,
+    v_scale: Annotated[
+        int, Field(default=100, description="Vertical scale (e.g., 100 for 1:100)")
+    ] = 100,
 ) -> Image:
     """
     Generates a professional longitudinal profile (PNG) for pipelines or roads.
@@ -398,23 +495,32 @@ def draw_longitudinal_profile(
 
 @mcp.tool()
 def export_profile_to_dxf(
-    title: str = Field(
-        default="Longitudinal Profile", description="Profile title stored in DXF"
-    ),
-    points_json: list[dict] = Field(
-        default=[],
-        description="List of profile points with station, elevation, and optional design data",
-    ),
-    filename: str = Field(
-        default="exported_profile.dxf",
-        description="Output DXF filename (saved in 'output/' directory)",
-    ),
-    h_scale: int = Field(
-        default=1000, description="Horizontal scale (e.g., 1000 for 1:1000)"
-    ),
-    v_scale: int = Field(
-        default=100, description="Vertical scale (e.g., 100 for 1:100)"
-    ),
+    title: Annotated[
+        str,
+        Field(
+            default="Longitudinal Profile", description="Profile title stored in DXF"
+        ),
+    ] = "Longitudinal Profile",
+    points_json: Annotated[
+        list[dict],
+        Field(
+            default=[],
+            description="List of profile points with station, elevation, and optional design data",
+        ),
+    ] = [],
+    filename: Annotated[
+        str,
+        Field(
+            default="exported_profile.dxf",
+            description="Output DXF filename (saved in 'output/' directory)",
+        ),
+    ] = "exported_profile.dxf",
+    h_scale: Annotated[
+        int, Field(default=1000, description="Horizontal scale (e.g., 1000 for 1:1000)")
+    ] = 1000,
+    v_scale: Annotated[
+        int, Field(default=100, description="Vertical scale (e.g., 100 for 1:100)")
+    ] = 100,
 ) -> str:
     """
     Exports a longitudinal profile to a professional DXF file for AutoCAD.
@@ -434,30 +540,48 @@ def export_profile_to_dxf(
 
 @mcp.tool()
 def draw_interior_plan(
-    title: str = Field(default="Floor Plan", description="Architectural drawing title"),
-    walls_json: list[dict] = Field(
-        default=[],
-        description="List of wall definitions with start_pt, end_pt, thickness, and openings",
-    ),
-    rooms_json: list[dict] = Field(
-        default=[], description="List of room/polygon boundaries with points and labels"
-    ),
-    furniture_json: list[dict] = Field(
-        default=[],
-        description="List of furniture blocks (bed, sofa, wc, bath, sink, stove)",
-    ),
-    language: str = Field(
-        default="ru", description="Drawing language: 'ru' (Russian) or 'en' (English)"
-    ),
-    paper_format: str = Field(
-        default="A4", description="Paper size: A0, A1, A2, A3, A4, etc."
-    ),
-    scale: int = Field(
-        default=50, description="Drawing scale denominator (e.g., 50 for 1:50)"
-    ),
-    output_path: Optional[str] = Field(
-        default=None, description="Optional file path to save PNG output"
-    ),
+    title: Annotated[
+        str, Field(default="Floor Plan", description="Architectural drawing title")
+    ] = "Floor Plan",
+    walls_json: Annotated[
+        list[dict],
+        Field(
+            default=[],
+            description="List of wall definitions with start_pt, end_pt, thickness, and openings",
+        ),
+    ] = [],
+    rooms_json: Annotated[
+        list[dict],
+        Field(
+            default=[],
+            description="List of room/polygon boundaries with points and labels",
+        ),
+    ] = [],
+    furniture_json: Annotated[
+        list[dict],
+        Field(
+            default=[],
+            description="List of furniture blocks (bed, sofa, wc, bath, sink, stove)",
+        ),
+    ] = [],
+    language: Annotated[
+        str,
+        Field(
+            default="ru",
+            description="Drawing language: 'ru' (Russian) or 'en' (English)",
+        ),
+    ] = "ru",
+    paper_format: Annotated[
+        str, Field(default="A4", description="Paper size: A0, A1, A2, A3, A4, etc.")
+    ] = "A4",
+    scale: Annotated[
+        int,
+        Field(default=50, description="Drawing scale denominator (e.g., 50 for 1:50)"),
+    ] = 50,
+    output_path: Annotated[
+        Optional[str],
+        Field(default=None, description="Optional file path to save PNG output"),
+    ] = None,
 ) -> Image:
     """
     Generates a professional architectural floor plan (PNG).
@@ -502,20 +626,33 @@ def draw_interior_plan(
 
 @mcp.tool()
 def draw_construction_as_built_report(
-    title: str = Field(default="As-Built Survey Report", description="Report title"),
-    as_built_points_json: list[dict] = Field(
-        default=[],
-        description="List of as-built survey points with design vs. as-built coordinates",
-    ),
-    volume_grid_json: Optional[dict] = Field(
-        default=None, description="Optional volume grid data for earthwork calculation"
-    ),
-    language: str = Field(
-        default="ru", description="Drawing language: 'ru' (Russian) or 'en' (English)"
-    ),
-    paper_format: str = Field(
-        default="A3", description="Paper size: A0, A1, A2, A3, A4, etc."
-    ),
+    title: Annotated[
+        str, Field(default="As-Built Survey Report", description="Report title")
+    ] = "As-Built Survey Report",
+    as_built_points_json: Annotated[
+        list[dict],
+        Field(
+            default=[],
+            description="List of as-built survey points with design vs. as-built coordinates",
+        ),
+    ] = [],
+    volume_grid_json: Annotated[
+        Optional[dict],
+        Field(
+            default=None,
+            description="Optional volume grid data for earthwork calculation",
+        ),
+    ] = None,
+    language: Annotated[
+        str,
+        Field(
+            default="ru",
+            description="Drawing language: 'ru' (Russian) or 'en' (English)",
+        ),
+    ] = "ru",
+    paper_format: Annotated[
+        str, Field(default="A3", description="Paper size: A0, A1, A2, A3, A4, etc.")
+    ] = "A3",
 ) -> Image:
     """
     Generates a construction report showing deviations (plan/fact) and earthwork volumes.
@@ -549,12 +686,18 @@ def draw_construction_as_built_report(
 
 @mcp.tool()
 def adjust_network_least_squares(
-    observations_json: list[dict] = Field(
-        description="List of survey observations with type, stations, measurements, and precision"
-    ),
-    initial_coords: Dict[str, Dict[str, float]] = Field(
-        description="Dictionary of initial point coordinates by station name, e.g. {'P1': {'x': 100.0, 'y': 200.0}, ...}"
-    ),
+    observations_json: Annotated[
+        list[dict],
+        Field(
+            description="List of survey observations with type, stations, measurements, and precision"
+        ),
+    ],
+    initial_coords: Annotated[
+        Dict[str, Dict[str, float]],
+        Field(
+            description="Dictionary of initial point coordinates by station name, e.g. {'P1': {'x': 100.0, 'y': 200.0}, ...}"
+        ),
+    ],
 ) -> dict:
     """
     Performs a 2D Least Squares Adjustment on a surveying network.
@@ -567,16 +710,22 @@ def adjust_network_least_squares(
 
 @mcp.tool()
 def transform_coordinate_system(
-    lat: float = Field(description="Latitude of WGS84 point in decimal degrees"),
-    lon: float = Field(description="Longitude of WGS84 point in decimal degrees"),
-    h: float = Field(description="Ellipsoidal height (H) in meters"),
-    dx: float = Field(description="Helmert translation X (meters)"),
-    dy: float = Field(description="Helmert translation Y (meters)"),
-    dz: float = Field(description="Helmert translation Z (meters)"),
-    rx: float = Field(description="Helmert rotation X (arc-seconds)"),
-    ry: float = Field(description="Helmert rotation Y (arc-seconds)"),
-    rz: float = Field(description="Helmert rotation Z (arc-seconds)"),
-    s: float = Field(description="Helmert scale factor (PPM, parts per million)"),
+    lat: Annotated[
+        float, Field(description="Latitude of WGS84 point in decimal degrees")
+    ],
+    lon: Annotated[
+        float, Field(description="Longitude of WGS84 point in decimal degrees")
+    ],
+    h: Annotated[float, Field(description="Ellipsoidal height (H) in meters")],
+    dx: Annotated[float, Field(description="Helmert translation X (meters)")],
+    dy: Annotated[float, Field(description="Helmert translation Y (meters)")],
+    dz: Annotated[float, Field(description="Helmert translation Z (meters)")],
+    rx: Annotated[float, Field(description="Helmert rotation X (arc-seconds)")],
+    ry: Annotated[float, Field(description="Helmert rotation Y (arc-seconds)")],
+    rz: Annotated[float, Field(description="Helmert rotation Z (arc-seconds)")],
+    s: Annotated[
+        float, Field(description="Helmert scale factor (PPM, parts per million)")
+    ],
 ) -> dict:
     """
     Performs a 7-parameter Helmert transformation from WGS84 to a local system.
@@ -596,11 +745,11 @@ def transform_coordinate_system(
 
 @mcp.tool()
 def project_coordinates_gauss_kruger(
-    lat: float = Field(description="Latitude in decimal degrees (WGS84)"),
-    lon: float = Field(description="Longitude in decimal degrees (WGS84)"),
-    central_meridian: float = Field(
-        description="Central meridian of GK zone in decimal degrees"
-    ),
+    lat: Annotated[float, Field(description="Latitude in decimal degrees (WGS84)")],
+    lon: Annotated[float, Field(description="Longitude in decimal degrees (WGS84)")],
+    central_meridian: Annotated[
+        float, Field(description="Central meridian of GK zone in decimal degrees")
+    ],
 ) -> dict:
     """
     Projects geodetic coordinates to Gauss-Krüger (X, Y) grid.
