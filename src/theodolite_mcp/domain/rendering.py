@@ -968,18 +968,36 @@ def _draw_stamp(fig, plan: PlotPlan, scale_str: str, pw_mm: float, ph_mm: float,
 def _draw_explication(fig, items: List, total_area: float, pw_mm: float, ph_mm: float, lang: str = "ru"):
     """
     Renders an engineering/architectural schedule (Explication).
-    Supports list of Zones or list of Rooms.
+    Dynamically scales font and row height to fit all items.
     """
     texts = I18N.get(lang, I18N["ru"])
-    # Position: Bottom Left of the inner frame
+    # 1. Base Dimensions
     width_mm = 85.0
-    row_h = 6.0
-    header_h = 8.0
-    title_h = 10.0
+    base_row_h = 6.0
+    base_font_size = 6.5
+    header_area_mm = 18.0 # title_h + header_h
     
-    # Calculate total table height
-    num_items = min(len(items), 15) 
-    table_h = title_h + header_h + (num_items + 1) * row_h 
+    # 2. Dynamic Scaling logic
+    num_items = len(items)
+    # Available height is 80% of page height
+    max_table_h = ph_mm * 0.8
+    
+    # Calculate required row height
+    required_h = header_area_mm + (num_items + 1) * base_row_h
+    
+    row_h = base_row_h
+    font_size = base_font_size
+    
+    if required_h > max_table_h:
+        # Scale down
+        row_h = (max_table_h - header_area_mm) / (num_items + 1)
+        # Don't go below 2.5mm for row height (unreadable)
+        row_h = max(row_h, 2.5)
+        # Font size follows row height (proportional)
+        font_size = base_font_size * (row_h / base_row_h)
+        font_size = max(font_size, 3.5) # Minimum readable font
+        
+    table_h = header_area_mm + (num_items + 1) * row_h
     
     left_mm = MARGIN_LEFT
     bottom_mm = MARGIN_OTHER
@@ -993,47 +1011,45 @@ def _draw_explication(fig, items: List, total_area: float, pw_mm: float, ph_mm: 
     
     y = 1.0
     # Title
+    title_h_norm = 10.0 / table_h
     ax_leg.axhline(y, color='black', lw=D_WIDE)
-    ax_leg.text(0.5, y - (title_h/table_h)/2, texts["explication"], 
-                fontproperties=_get_font(8, bold=True), ha='center', va='center')
-    y -= (title_h/table_h)
+    ax_leg.text(0.5, y - title_h_norm/2, texts["explication"], 
+                fontproperties=_get_font(font_size + 1, bold=True), ha='center', va='center')
+    y -= title_h_norm
     
     # Header
+    header_h_norm = 8.0 / table_h
     ax_leg.axhline(y, color='black', lw=D_WIDE)
-    h_y = y - (header_h/table_h)/2
-    ax_leg.text(c1/2, h_y, texts["num"], fontproperties=_get_font(6.5, bold=True), ha='center', va='center')
-    ax_leg.text(c1 + c2/2, h_y, texts["name"], fontproperties=_get_font(6.5, bold=True), ha='center', va='center')
-    ax_leg.text(c1 + c2 + c3/2, h_y, texts["area_sqm"], fontproperties=_get_font(6.5, bold=True), ha='center', va='center')
-    y -= (header_h/table_h)
+    h_y = y - header_h_norm/2
+    ax_leg.text(c1/2, h_y, texts["num"], fontproperties=_get_font(font_size, bold=True), ha='center', va='center')
+    ax_leg.text(c1 + c2/2, h_y, texts["name"], fontproperties=_get_font(font_size, bold=True), ha='center', va='center')
+    ax_leg.text(c1 + c2 + c3/2, h_y, texts["area_sqm"], fontproperties=_get_font(font_size, bold=True), ha='center', va='center')
+    y -= header_h_norm
     
     # Rows
+    row_h_norm = row_h / table_h
     for i in range(num_items):
         item = items[i]
         area = calculate_area(item.points) or 0
         number = getattr(item, 'number', str(i + 1))
         ax_leg.axhline(y, color='black', lw=D)
-        row_y = y - (row_h/table_h)/2
-        
-        if i == 14 and len(items) > 15:
-            # Last visible row shows "others"
-            ax_leg.text(0.5, row_y, texts["others"], fontproperties=_get_font(6, italic=True), ha='center', va='center')
-        else:
-            ax_leg.text(c1/2, row_y, number, fontproperties=_get_font(6.5), ha='center', va='center')
-            ax_leg.text(c1 + 0.02, row_y, item.name[:24], fontproperties=_get_font(6.5), ha='left', va='center')
-            ax_leg.text(c1 + c2 + c3/2, row_y, f'{area:.2f}', fontproperties=_get_font(6.5), ha='center', va='center')
-        y -= (row_h/table_h)
+        row_y = y - row_h_norm/2
+        ax_leg.text(c1/2, row_y, number, fontproperties=_get_font(font_size), ha='center', va='center')
+        ax_leg.text(c1 + 0.02, row_y, item.name[:28], fontproperties=_get_font(font_size), ha='left', va='center')
+        ax_leg.text(c1 + c2 + c3/2, row_y, f'{area:.2f}', fontproperties=_get_font(font_size), ha='center', va='center')
+        y -= row_h_norm
     
     # Total
     ax_leg.axhline(y, color='black', lw=D_WIDE)
-    row_y = y - (row_h/table_h)/2
-    ax_leg.text(c1 + c2/2, row_y, texts["total_area"], fontproperties=_get_font(7, bold=True), ha='center', va='center')
-    ax_leg.text(c1 + c2 + c3/2, row_y, f'{total_area:.2f}', fontproperties=_get_font(7, bold=True), ha='center', va='center')
-    y -= (row_h/table_h)
+    row_y = y - row_h_norm/2
+    ax_leg.text(c1 + c2/2, row_y, texts["total_area"], fontproperties=_get_font(font_size, bold=True), ha='center', va='center')
+    ax_leg.text(c1 + c2 + c3/2, row_y, f'{total_area:.2f}', fontproperties=_get_font(font_size, bold=True), ha='center', va='center')
+    y -= row_h_norm
     ax_leg.axhline(y, color='black', lw=D_WIDE)
     
     # Vertical lines
-    ax_leg.axvline(c1, color='black', lw=D, ymin=y, ymax=1-(title_h/table_h))
-    ax_leg.axvline(c1+c2, color='black', lw=D, ymin=y, ymax=1-(title_h/table_h))
+    ax_leg.axvline(c1, color='black', lw=D, ymin=0, ymax=1-title_h_norm)
+    ax_leg.axvline(c1+c2, color='black', lw=D, ymin=0, ymax=1-title_h_norm)
 
 def _draw_north_arrow(ax, lang: str = "ru"):
     texts = I18N.get(lang, I18N["ru"])
