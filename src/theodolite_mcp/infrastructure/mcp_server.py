@@ -188,6 +188,42 @@ def draw_plot_plan(
     return Image(data=png_bytes, format="png")
 
 @mcp.tool()
+def export_to_dxf(
+    title: str = "Cadastral Plan",
+    boundary_json: list[dict] = [],
+    zones_json: list[dict] = [],
+    filename: str = "exported_plan.dxf",
+    coordinate_labels: bool = False,
+) -> str:
+    """
+    Exports a cadastral/site plan to a professional DXF file for AutoCAD/Civil 3D.
+    Saves the file locally in the 'output' directory and returns the full path.
+    The output includes layers for BOUNDARY, POINTS, BUILDINGS, WATER, and GREEN zones.
+    """
+    boundary_points = [Point(**pt) for pt in boundary_json]
+    zones = []
+    for z in zones_json:
+        pts = [Point(**p) for p in z.get("points", [])]
+        zones.append(Zone(
+            name=z.get("name", "Zone"),
+            points=pts,
+            fill_color=z.get("fill_color"),
+        ))
+    plan = PlotPlan(
+        title=title,
+        boundary_points=boundary_points,
+        zones=zones,
+        coordinate_labels=coordinate_labels,
+    )
+
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+    full_path = os.path.join(output_dir, filename)
+    
+    path = service.export_dxf(plan, full_path)
+    return f"✅ DXF file successfully exported to: {os.path.abspath(path)}"
+
+@mcp.tool()
 def adjust_network_least_squares(
     observations_json: list[dict],
     initial_coords: dict[str, dict[str, float]]
