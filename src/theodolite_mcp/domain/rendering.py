@@ -10,7 +10,7 @@ import matplotlib.patches as patches
 from matplotlib.font_manager import FontProperties
 import textwrap
 
-from .models import PlotPlan, Point, Zone, AsBuiltPoint, VolumeGrid, ProfilePlan, ProfilePoint, InteriorPlan, Wall, Opening, Room
+from .models import PlotPlan, Point, Zone, AsBuiltPoint, VolumeGrid, ProfilePlan, ProfilePoint, InteriorPlan, Wall, Opening, Room, FurnitureItem
 from .logic import calculate_azimuth_from_points, calculate_area
 
 # --- ISO 128-20:1996 & ISO 128-23:1999 Standards Constants ---
@@ -1395,6 +1395,48 @@ def _draw_openings(ax, wall, p1, p2, dx, dy, length, nx, ny):
             ax.fill(*zip((ox1+nx, oy1+ny), (ox2+nx, oy2+ny), (ox2-nx, oy2-ny), (ox1-nx, oy1-ny)), 
                     color='white', edgecolor='none', zorder=7)
 
+def _draw_furniture(ax, items: List[FurnitureItem]):
+    """
+    Renders 2D furniture and sanitary blocks based on type and dimensions.
+    """
+    for item in items:
+        w, l = item.width, item.length
+        cx, cy = item.center_pt.x, item.center_pt.y
+        angle = math.radians(item.rotation)
+        
+        def rot(px, py):
+            rx = px * math.cos(angle) - py * math.sin(angle)
+            ry = px * math.sin(angle) + py * math.cos(angle)
+            return rx + cx, ry + cy
+
+        # Base frame
+        corners = [rot(-w/2, -l/2), rot(w/2, -l/2), rot(w/2, l/2), rot(-w/2, l/2), rot(-w/2, -l/2)]
+        ax.plot(*zip(*corners), color='black', lw=D, alpha=0.7, zorder=8)
+        
+        t = item.type.lower()
+        if t == "wc":
+            bowl = patches.Circle(rot(0, l*0.1), w*0.35, color='black', fill=False, lw=D, zorder=9)
+            ax.add_patch(bowl)
+            tank = [rot(-w*0.4, -l*0.4), rot(w*0.4, -l*0.4), rot(w*0.4, -l*0.1), rot(-w*0.4, -l*0.1), rot(-w*0.4, -l*0.4)]
+            ax.plot(*zip(*tank), color='black', lw=D, zorder=9)
+        elif t == "bath":
+            inner = patches.Ellipse(rot(0,0), w*0.8, l*0.8, angle=item.rotation, fill=False, lw=D, zorder=9)
+            ax.add_patch(inner)
+        elif t == "bed":
+            # Pillows
+            for dx in [-0.25, 0.25]:
+                p = [rot(w*dx - w*0.15, l*0.25), rot(w*dx + w*0.15, l*0.25), 
+                     rot(w*dx + w*0.15, l*0.4), rot(w*dx - w*0.15, l*0.4), rot(w*dx - w*0.15, l*0.25)]
+                ax.plot(*zip(*p), color='black', lw=D, zorder=9)
+        elif t == "stove":
+            for dx, dy in [(-0.25,-0.25), (0.25,-0.25), (-0.25,0.25), (0.25,0.25)]:
+                b = patches.Circle(rot(w*dx, l*dy), w*0.12, color='black', fill=False, lw=D, zorder=9)
+                ax.add_patch(b)
+        elif t == "sofa":
+            ax.plot(*zip(*[rot(-w/2, l*0.3), rot(w/2, l*0.3)]), color='black', lw=D, zorder=9)
+            ax.plot(*zip(*[rot(-w*0.4, -l/2), rot(-w*0.4, l/2)]), color='black', lw=D, zorder=9)
+            ax.plot(*zip(*[rot(w*0.4, -l/2), rot(w*0.4, l/2)]), color='black', lw=D, zorder=9)
+
 def render_interior_plan(plan: InteriorPlan) -> bytes:
     dpi = plan.dpi
     base_w, base_h = PAPER_SIZES.get(plan.paper_format.upper(), PAPER_SIZES["A4"])
@@ -1440,6 +1482,9 @@ def render_interior_plan(plan: InteriorPlan) -> bytes:
     ax.set_ylim(cy - view_h_m/2, cy + view_h_m/2)
     
     _draw_walls(ax, plan.walls)
+    
+    if plan.furniture:
+        _draw_furniture(ax, plan.furniture)
     
     for rm in plan.rooms:
         rx, ry = _centroid(rm.points)

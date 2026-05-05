@@ -74,6 +74,13 @@ class Room(BaseModel):
     points: List[Point]
     floor_material: str = "concrete"
 
+class FurnitureItem(BaseModel):
+    type: str # "bed", "sofa", "table", "chair", "wc", "bath", "sink", "stove"
+    center_pt: Point
+    width: float
+    length: float
+    rotation: float = 0.0 # Degrees
+
 class InteriorPlan(BaseModel):
     title: str = "Floor Plan"
     project_number: str = "A-001"
@@ -81,6 +88,7 @@ class InteriorPlan(BaseModel):
     date: str = "2026-05-05"
     walls: List[Wall]
     rooms: List[Room] = []
+    furniture: List[FurnitureItem] = []
     language: str = "ru"
     paper_format: str = "A4"
     orientation: str = "landscape"

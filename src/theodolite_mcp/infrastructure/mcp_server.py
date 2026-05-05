@@ -284,16 +284,15 @@ def draw_interior_plan(
     title: str = "Floor Plan",
     walls_json: list[dict] = [],
     rooms_json: list[dict] = [],
+    furniture_json: list[dict] = [],
     language: str = "ru",
     paper_format: str = "A4",
     scale: int = 50,
 ) -> Image:
     """
     Generates a professional architectural floor plan (PNG).
-    IMPORTANT: All coordinates and dimensions (thickness, width, start_distance) MUST be in METERS.
-    e.g. 500mm = 0.5, 3m = 3.0.
-    Supports walls with thickness, door/window openings, and room labels.
-    If scale is set to 0, it will auto-scale to fit the sheet.
+    IMPORTANT: All coordinates and dimensions MUST be in METERS.
+    Supports walls with thickness, door/window openings, and furniture blocks (bed, sofa, wc, bath, sink, stove).
     """
     walls = []
     for w in walls_json:
@@ -315,11 +314,14 @@ def draw_interior_plan(
             number=r.get("number", "1"),
             points=pts
         ))
+    
+    furniture = [FurnitureItem(type=f["type"], center_pt=Point(**f["center_pt"]), width=f["width"], length=f["length"], rotation=f.get("rotation", 0.0)) for f in furniture_json]
         
     plan = InteriorPlan(
         title=title,
         walls=walls,
         rooms=rooms,
+        furniture=furniture,
         language=language,
         paper_format=paper_format,
         scale=scale
