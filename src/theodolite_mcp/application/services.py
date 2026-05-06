@@ -15,6 +15,23 @@ from ..domain.rendering import (
     render_interior_plan,
 )
 from ..domain.dxf_export import export_plan_to_dxf, export_profile_to_dxf
+from ..domain.dxf_validation import validate_dxf_file, ValidationReport
+from ..domain.least_squares import ObservationLS, adjust_network_2d, LSAResult
+from ..domain.geodesy import (
+    WGS84,
+    KRASOVSKY,
+    helmert_transform,
+    geodetic_to_ecef,
+    ecef_to_geodetic,
+    gauss_kruger_forward,
+)
+from ..domain.rendering import (
+    render_plot_plan,
+    render_profile_plan,
+    render_interior_plan,
+)
+from ..domain.dxf_export import export_plan_to_dxf, export_profile_to_dxf
+from ..domain.dxf_validation import validate_dxf_file, ValidationReport
 from ..domain.least_squares import ObservationLS, adjust_network_2d, LSAResult
 from ..domain.geodesy import (
     WGS84,
@@ -56,6 +73,12 @@ class SurveyService:
 
     def export_profile_dxf(self, plan: ProfilePlan, output_path: str) -> str:
         return export_profile_to_dxf(plan, output_path)
+
+    def validate_dxf(
+        self, dxf_path: str, check_geometry: bool = True
+    ) -> ValidationReport:
+        """Validate a DXF file for common issues."""
+        return validate_dxf_file(dxf_path, check_geometry)
 
     def adjust_network_least_squares(
         self,

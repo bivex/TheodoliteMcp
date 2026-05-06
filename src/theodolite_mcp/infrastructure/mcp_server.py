@@ -612,6 +612,62 @@ def mcp_export_profile_to_dxf(
 
 
 @mcp.tool()
+def validate_dxf(
+    dxf_path: Annotated[
+        str,
+        Field(
+            description="Path to DXF file (absolute or relative to current working directory)"
+        ),
+    ],
+    check_geometry: Annotated[
+        bool,
+        Field(
+            default=True,
+            description="Enable expensive geometry checks (self-intersection, overlapping contours)",
+        ),
+    ] = True,
+) -> dict:
+    """
+    Validates a DXF file for common issues affecting cadastral/surveying plans.
+    Checks performed:
+    - Orphan entities (no layer or unexpected layer)
+    - Overlapping/self-intersecting contours
+    - Invalid text labels (empty, NaN, Infinity, extreme coordinates)
+    - Zero-length line/polyline segments
+    - Duplicate/shared vertices between contours
+    Returns a detailed report with summary and issue list.
+    """
+    try:
+        report = service.validate_dxf(dxf_path, check_geometry)
+        return {
+            "valid": report.is_valid,
+            "has_errors": report.has_critical_errors,
+            "summary": report.summary(),
+            "file": report.file_path,
+            "total_entities": report.total_entities,
+            "layers": report.layers_found,
+            "counts": {
+                "polylines": report.polyline_entities,
+                "lines": report.line_entities,
+                "texts": report.text_entities,
+            },
+            "issues": [
+                {
+                    "entity_type": i.entity_type,
+                    "layer": i.layer,
+                    "handle": i.handle,
+                    "severity": i.severity.value,
+                    "message": i.message,
+                    "location": i.location,
+                }
+                for i in report.issues
+            ],
+        }
+    except Exception as e:
+        raise ValueError(f"validate_dxf error: {e}") from e
+
+
+@mcp.tool()
 def draw_interior_plan(
     title: Annotated[
         str, Field(default="Floor Plan", description="Architectural drawing title")
