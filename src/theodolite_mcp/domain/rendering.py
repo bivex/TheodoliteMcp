@@ -120,6 +120,42 @@ TYPE_05 = (0, (LD, GP, DT, GP, DT, GP))  # Long dashed double-dotted
 TYPE_RAILWAY = (0, (DS, DT, DS, DT))
 
 # Localization Dictionary
+class LabelTracker:
+    """Rectangle-based collision tracker for label placement.
+    Uses bounding box overlap instead of point-distance checks
+    to properly handle multi-character text labels.
+    """
+
+    def __init__(self):
+        self.boxes: List[Tuple[float, float, float, float]] = []
+
+    def text_bounds(
+        self, x: float, y: float, text: str, fontsize: float, m_per_pt: float
+    ) -> Tuple[float, float, float, float]:
+        char_w = fontsize * 0.5 * MM_TO_PT * m_per_pt
+        char_h = fontsize * MM_TO_PT * m_per_pt
+        lines = text.split("\n")
+        max_len = max(len(line) for line in lines) if lines else 1
+        half_w = max_len * char_w / 2
+        half_h = len(lines) * char_h / 2
+        return (x - half_w, y - half_h, x + half_w, y + half_h)
+
+    def collides(self, box: Tuple[float, float, float, float]) -> bool:
+        x1, y1, x2, y2 = box
+        for bx1, by1, bx2, by2 in self.boxes:
+            if x1 < bx2 and x2 > bx1 and y1 < by2 and y2 > by1:
+                return True
+        return False
+
+    def add(self, box: Tuple[float, float, float, float]) -> None:
+        self.boxes.append(box)
+
+    def add_text(
+        self, x: float, y: float, text: str, fontsize: float, m_per_pt: float
+    ) -> None:
+        self.add(self.text_bounds(x, y, text, fontsize, m_per_pt))
+
+
 I18N: Dict[str, Dict[str, str]] = {
     "ru": {
         "project": "Проект:",
@@ -731,7 +767,18 @@ def _draw_zones(
     show_areas: bool = False,
     standard: str = "construction",
     m_per_pt: float = 0.1,
+    tracker: Optional[LabelTracker] = None,
 ):
+    # Determine drawing center for leader direction logic
+    all_pts = []
+    for zone in zones:
+        all_pts.extend(zone.points)
+    if all_pts:
+        draw_cx = sum(p.x for p in all_pts) / len(all_pts)
+        draw_cy = sum(p.y for p in all_pts) / len(all_pts)
+    else:
+        draw_cx, draw_cy = 0, 0
+
     for i, zone in enumerate(zones):
         color = zone.fill_color or _auto_color(i)
         hatch = _get_hatch(zone.name)
@@ -767,19 +814,15 @@ def _draw_zones(
 
         if standard == "shipbuilding":
             if is_tight:
-                # ISO 128-25: 01+03 Railway line for tight bulkheads
                 lw = D_WIDE
                 ls = TYPE_RAILWAY
             elif is_bulkhead:
-                # ISO 128-25, 01.2: Continuous wide for structural members
                 lw = D_WIDE
                 ls = TYPE_01
             else:
-                # ISO 128-25, 01.1: Continuous narrow for others
                 lw = D
                 ls = TYPE_01
         else:
-            # Construction standard
             if is_building:
                 lw = D_WIDE
                 ls = TYPE_01
@@ -789,25 +832,65 @@ def _draw_zones(
 
         ax.plot(xs, ys, color="black", linewidth=lw, linestyle=ls, zorder=3)
 
-        # 3. Inscriptions & Labels (ISO 128-50: Interruption of hatching)
+        # 4. Inscriptions & Labels
         zx, zy = _centroid(zone.points)
 
-        # Determine if we should use a leader for the zone number
-        # If it's a line (area < 0.1) or shipbuilding (more crowded), use leader
         if area < 0.5 or standard == "shipbuilding":
+            # Direction: push label away from drawing center
+            dx = zx - draw_cx
+            dy = zy - draw_cy
+            dist = math.hypot(dx, dy)
+            if dist > 0:
+                off_x = dx / dist * 5
+                off_y = dy / dist * 5
+            else:
+                # Alternate direction for coincident zones
+                angle = i * 2.4
+                off_x = math.cos(angle) * 5
+                off_y = math.sin(angle) * 5
+
             _draw_leader(
                 ax,
                 zx,
                 zy,
                 str(i + 1),
-                offset_x=4,
-                offset_y=4,
+                offset_x=off_x,
+                offset_y=off_y,
                 terminator="dot",
                 m_per_pt=m_per_pt,
                 fontsize=8,
+                tracker=tracker,
             )
         else:
-            # Opaque white bbox (alpha=1.0) creates the 'window' in the hatching
+            label_text = str(i + 1)
+            if tracker:
+                box = tracker.text_bounds(zx, zy, label_text, 8.5, m_per_pt)
+                if tracker.collides(box):
+                    # Fall back to leader
+                    dx = zx - draw_cx
+                    dy = zy - draw_cy
+                    dist = math.hypot(dx, dy)
+                    if dist > 0:
+                        off_x = dx / dist * 5
+                        off_y = dy / dist * 5
+                    else:
+                        angle = i * 2.4
+                        off_x = math.cos(angle) * 5
+                        off_y = math.sin(angle) * 5
+                    _draw_leader(
+                        ax,
+                        zx,
+                        zy,
+                        label_text,
+                        offset_x=off_x,
+                        offset_y=off_y,
+                        terminator="dot",
+                        m_per_pt=m_per_pt,
+                        fontsize=8,
+                        tracker=tracker,
+                    )
+                    continue
+
             ax.text(
                 zx,
                 zy,
@@ -824,10 +907,11 @@ def _draw_zones(
                     alpha=1.0,
                 ),
             )
+            if tracker:
+                tracker.add_text(zx, zy, str(i + 1), 8.5, m_per_pt)
 
         if show_areas and area >= 0.5:
-            # Inscription below the zone number with scaled offset
-            area_offset = 1.2 * (m_per_pt / 0.1)  # Scale with drawing
+            area_offset = 1.2 * (m_per_pt / 0.1)
             ax.text(
                 zx,
                 zy - area_offset,
@@ -855,10 +939,12 @@ def _draw_leader(
     terminator: str = "dot",
     m_per_pt: float = 0.1,
     fontsize: float = 7,
+    tracker: Optional[LabelTracker] = None,
 ):
     """
     ISO 128-22: Leader and reference lines.
     terminator: 'dot' (area), 'arrow' (edge/line), or 'none'.
+    tracker: optional LabelTracker to avoid shelf text collisions.
     """
     d_m = D * m_per_pt
     # Shelf length adapted to text (approx 1.8mm per char + margins)
@@ -909,6 +995,31 @@ def _draw_leader(
 
     # 3. Reference line (Shelf) - strictly horizontal
     shelf_dir = 1 if offset_x >= 0 else -1
+
+    # Check shelf text collision and try flipping direction
+    text_x = lx + shelf_dir * shelf_len / 2
+    text_y = ly + 2 * d_m
+    if tracker:
+        text_box = tracker.text_bounds(text_x, text_y, text, fontsize, m_per_pt)
+        if tracker.collides(text_box):
+            # Try opposite shelf direction
+            alt_dir = -shelf_dir
+            alt_text_x = lx + alt_dir * shelf_len / 2
+            alt_box = tracker.text_bounds(alt_text_x, text_y, text, fontsize, m_per_pt)
+            if not tracker.collides(alt_box):
+                shelf_dir = alt_dir
+                text_x = alt_text_x
+            else:
+                # Try shifting vertically
+                for shift in [1.5, -1.5, 3.0, -3.0]:
+                    shifted_y = ly + shift * MM_TO_PT * m_per_pt
+                    shifted_box = tracker.text_bounds(
+                        text_x, shifted_y, text, fontsize, m_per_pt
+                    )
+                    if not tracker.collides(shifted_box):
+                        text_y = shifted_y
+                        break
+
     ax.plot(
         [lx, lx + shelf_dir * shelf_len],
         [ly, ly],
@@ -920,14 +1031,16 @@ def _draw_leader(
 
     # 4. Text - preferably above shelf, gap = 2 * line width
     ax.text(
-        lx + shelf_dir * shelf_len / 2,
-        ly + 2 * d_m,
+        text_x,
+        text_y,
         text,
         fontproperties=_get_font(fontsize, m_per_pt=m_per_pt),
         ha="center",
         va="bottom",
         zorder=10,
     )
+    if tracker:
+        tracker.add_text(text_x, text_y, text, fontsize, m_per_pt)
 
 
 def _draw_vertex_labels(
@@ -937,9 +1050,9 @@ def _draw_vertex_labels(
     standard: str = "construction",
     m_per_pt: float = 0.1,
     show_coords: bool = False,
+    tracker: Optional[LabelTracker] = None,
 ):
     cx, cy = _centroid(points)
-    used_positions = []
     used_points = []
 
     for i, p in enumerate(points):
@@ -950,7 +1063,6 @@ def _draw_vertex_labels(
 
         name = p.name
         if show_coords:
-            # Use intelligent formatting to avoid huge number strings
             x_str = _format_coord_value(p.x)
             y_str = _format_coord_value(p.y)
             name += f"\n({x_str}, {y_str})"
@@ -961,7 +1073,6 @@ def _draw_vertex_labels(
         dx, dy = p.x - cx, p.y - cy
         dist = math.hypot(dx, dy)
 
-        # Default offset
         off_val = 3.5
         vx, vy = (
             (dx / dist * off_val, dy / dist * off_val)
@@ -969,20 +1080,31 @@ def _draw_vertex_labels(
             else (off_val, off_val)
         )
 
-        # Check if this position is too close to any previously used position
         pos_x, pos_y = p.x + vx, p.y + vy
-        collision = False
-        # Collision threshold: scaled by font size (approx 2mm per 7pt font)
-        # Larger fonts need more clearance
-        collision_threshold = max(4.0, fontsize * 0.6) * MM_TO_PT * m_per_pt
 
-        for ux, uy in used_positions:
-            if math.hypot(pos_x - ux, pos_y - uy) < collision_threshold:
-                collision = True
-                break
+        # Check collision using rectangle-based tracker
+        collision = False
+        if tracker:
+            text_box = tracker.text_bounds(pos_x, pos_y, name, fontsize, m_per_pt)
+            collision = tracker.collides(text_box)
+            if collision:
+                # Try alternative radial positions (8 directions)
+                for angle_off in [0.8, -0.8, 1.6, -1.6, 2.4, -2.4, math.pi]:
+                    base_angle = math.atan2(vy, vx)
+                    alt_angle = base_angle + angle_off
+                    alt_vx = math.cos(alt_angle) * off_val
+                    alt_vy = math.sin(alt_angle) * off_val
+                    alt_pos_x, alt_pos_y = p.x + alt_vx, p.y + alt_vy
+                    alt_box = tracker.text_bounds(
+                        alt_pos_x, alt_pos_y, name, fontsize, m_per_pt
+                    )
+                    if not tracker.collides(alt_box):
+                        pos_x, pos_y = alt_pos_x, alt_pos_y
+                        vx, vy = alt_vx, alt_vy
+                        collision = False
+                        break
 
         if collision:
-            # Shift further and use a leader
             _draw_leader(
                 ax,
                 p.x,
@@ -993,6 +1115,7 @@ def _draw_vertex_labels(
                 terminator="none",
                 m_per_pt=m_per_pt,
                 fontsize=fontsize - 1,
+                tracker=tracker,
             )
         else:
             ax.text(
@@ -1005,7 +1128,8 @@ def _draw_vertex_labels(
                 zorder=5,
                 bbox=dict(facecolor="white", edgecolor="none", alpha=0.8, pad=0.05),
             )
-            used_positions.append((pos_x, pos_y))
+            if tracker:
+                tracker.add_text(pos_x, pos_y, name, fontsize, m_per_pt)
 
 
 def _draw_distances(
@@ -2422,6 +2546,8 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     ax.set_xlabel("X (m)", fontproperties=_get_font(6.5, italic=True))
     ax.set_ylabel("Y (m)", fontproperties=_get_font(6.5, italic=True))
 
+    label_tracker = LabelTracker()
+
     if plan.zones:
         _draw_zones(
             ax,
@@ -2429,6 +2555,7 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
             show_areas=plan.show_areas,
             standard=plan.standard,
             m_per_pt=m_per_pt,
+            tracker=label_tracker,
         )
     _draw_boundary(ax, plan.boundary_points, standard=plan.standard)
 
@@ -2439,6 +2566,7 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
             standard=plan.standard,
             m_per_pt=m_per_pt,
             show_coords=plan.coordinate_labels,
+            tracker=label_tracker,
         )
     if plan.show_distances:
         _draw_distances(
