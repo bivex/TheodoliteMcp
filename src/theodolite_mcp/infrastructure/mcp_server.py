@@ -1176,3 +1176,289 @@ def reverse_azimuth(
 
 if __name__ == "__main__":
     mcp.run()
+
+
+# ========== SVG EXPORT TOOLS ==========
+
+
+@mcp.tool()
+def draw_plot_plan_svg(
+    title: Annotated[
+        str,
+        Field(
+            default="Cadastral Plan", description="Plan title displayed on the drawing"
+        ),
+    ] = "Cadastral Plan",
+    boundary_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of boundary vertices as {x: float, y: float} dicts",
+        ),
+    ] = None,
+    zones_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of zone definitions with name, points, and styling",
+        ),
+    ] = None,
+    language: Annotated[
+        str,
+        Field(
+            default="ru",
+            description="Drawing language: 'ru' (Russian) or 'en' (English)",
+        ),
+    ] = "ru",
+    standard: Annotated[
+        str,
+        Field(
+            default="construction",
+            description="Drawing standard: 'construction' (ISO 128-23) or 'shipbuilding' (ISO 129-4)",
+        ),
+    ] = "construction",
+    show_vertex_labels: Annotated[
+        bool,
+        Field(default=True, description="Display vertex point labels (P1, P2, ...)"),
+    ] = True,
+    show_distances: Annotated[
+        bool,
+        Field(default=True, description="Display distance labels on boundary edges"),
+    ] = True,
+    show_azimuths: Annotated[
+        bool, Field(default=True, description="Display azimuth/direction labels")
+    ] = True,
+    show_areas: Annotated[
+        bool, Field(default=True, description="Display computed area for each zone")
+    ] = True,
+    show_north_arrow: Annotated[
+        bool, Field(default=True, description="Display north arrow indicator")
+    ] = True,
+    show_scale_bar: Annotated[
+        bool, Field(default=True, description="Display scale bar")
+    ] = True,
+    coordinate_labels: Annotated[
+        bool,
+        Field(default=False, description="Display numeric coordinates at each vertex"),
+    ] = False,
+    width: Annotated[
+        float, Field(default=10.0, description="Plan width in inches")
+    ] = 10.0,
+    height: Annotated[
+        float, Field(default=10.0, description="Plan height in inches")
+    ] = 10.0,
+    dpi: Annotated[
+        int, Field(default=150, description="Image resolution in dots per inch")
+    ] = 150,
+    output_path: Annotated[
+        Optional[str],
+        Field(default=None, description="Optional file path to save SVG output"),
+    ] = None,
+) -> str:
+    """
+    Generate a cadastral/site plan as an SVG vector drawing.
+    Returns the SVG XML string. Optionally saves to file if output_path provided.
+    """
+    try:
+        if boundary_json is None:
+            boundary_json = []
+        if zones_json is None:
+            zones_json = []
+        boundary_points = [Point(**pt) for pt in boundary_json]
+        zones = []
+        for z in zones_json:
+            pts = [Point(**p) for p in z.get("points", [])]
+            zones.append(
+                Zone(
+                    name=z.get("name", "Zone"),
+                    points=pts,
+                    fill_color=z.get("fill_color"),
+                    fill_alpha=z.get("fill_alpha", 0.3),
+                )
+            )
+        plan = PlotPlan(
+            title=title,
+            boundary_points=boundary_points,
+            zones=zones,
+            language=language,
+            standard=standard,
+            show_vertex_labels=show_vertex_labels,
+            show_distances=show_distances,
+            show_azimuths=show_azimuths,
+            show_areas=show_areas,
+            show_north_arrow=show_north_arrow,
+            show_scale_bar=show_scale_bar,
+            coordinate_labels=coordinate_labels,
+            width_inches=width,
+            height_inches=height,
+            dpi=dpi,
+        )
+        svg_bytes = service.render_plot(
+            plan, output_path=output_path, output_format="svg"
+        )
+        return svg_bytes.decode("utf-8")
+    except Exception as e:
+        raise ValueError(f"draw_plot_plan_svg error: {e}") from e
+
+
+@mcp.tool()
+def draw_longitudinal_profile_svg(
+    title: Annotated[
+        str, Field(default="Longitudinal Profile", description="Profile title")
+    ] = "Longitudinal Profile",
+    points_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of profile points with station, elevation, and optional design data",
+        ),
+    ] = None,
+    language: Annotated[
+        str,
+        Field(
+            default="ru",
+            description="Drawing language: 'ru' (Russian) or 'en' (English)",
+        ),
+    ] = "ru",
+    paper_format: Annotated[
+        str, Field(default="A3", description="Paper size: A0, A1, A2, A3, A4, etc.")
+    ] = "A3",
+    h_scale: Annotated[
+        int, Field(default=1000, description="Horizontal scale (e.g., 1000 for 1:1000)")
+    ] = 1000,
+    v_scale: Annotated[
+        int, Field(default=100, description="Vertical scale (e.g., 100 for 1:100)")
+    ] = 100,
+    dpi: Annotated[
+        int, Field(default=150, description="Image resolution in dots per inch")
+    ] = 150,
+    output_path: Annotated[
+        Optional[str],
+        Field(default=None, description="Optional file path to save SVG output"),
+    ] = None,
+) -> str:
+    """
+    Generates a professional longitudinal profile as SVG (vector) for pipelines or roads.
+    Returns the SVG XML string. Optionally saves to file if output_path provided.
+    """
+    try:
+        if points_json is None:
+            points_json = []
+        pts = [ProfilePoint(**p) for p in points_json]
+        plan = ProfilePlan(
+            title=title,
+            points=pts,
+            language=language,
+            paper_format=paper_format,
+            horiz_scale=h_scale,
+            vert_scale=v_scale,
+        )
+        svg_bytes = service.render_profile(
+            plan, output_path=output_path, output_format="svg"
+        )
+        return svg_bytes.decode("utf-8")
+    except Exception as e:
+        raise ValueError(f"draw_longitudinal_profile_svg error: {e}") from e
+
+
+@mcp.tool()
+def draw_interior_plan_svg(
+    title: Annotated[
+        str, Field(default="Floor Plan", description="Architectural drawing title")
+    ] = "Floor Plan",
+    walls_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of wall definitions with start_pt, end_pt, thickness, and openings",
+        ),
+    ] = None,
+    rooms_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of room/polygon boundaries with points and labels",
+        ),
+    ] = None,
+    furniture_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of furniture blocks (bed, sofa, wc, bath, sink, stove)",
+        ),
+    ] = None,
+    language: Annotated[
+        str,
+        Field(
+            default="ru",
+            description="Drawing language: 'ru' (Russian) or 'en' (English)",
+        ),
+    ] = "ru",
+    paper_format: Annotated[
+        str, Field(default="A4", description="Paper size: A0, A1, A2, A3, A4, etc.")
+    ] = "A4",
+    scale: Annotated[
+        int,
+        Field(default=50, description="Drawing scale denominator (e.g., 50 for 1:50)"),
+    ] = 50,
+    dpi: Annotated[
+        int, Field(default=150, description="Image resolution in dots per inch")
+    ] = 150,
+    output_path: Annotated[
+        Optional[str],
+        Field(default=None, description="Optional file path to save SVG output"),
+    ] = None,
+) -> str:
+    """
+    Generates a professional architectural floor plan as SVG (vector).
+    IMPORTANT: All coordinates and dimensions MUST be in METERS.
+    Returns the SVG XML string. Optionally saves to file if output_path provided.
+    """
+    try:
+        if walls_json is None:
+            walls_json = []
+        if rooms_json is None:
+            rooms_json = []
+        if furniture_json is None:
+            furniture_json = []
+        walls = []
+        for w in walls_json:
+            openings = [Opening(**op) for op in w.get("openings", [])]
+            walls.append(
+                Wall(
+                    start_pt=Point(**w["start_pt"]),
+                    end_pt=Point(**w["end_pt"]),
+                    thickness=w.get("thickness", 0.3),
+                    material=w.get("material", "brick"),
+                    status=w.get("status", "existing"),
+                    openings=openings,
+                )
+            )
+
+        rooms = []
+        for r in rooms_json:
+            pts = [Point(**p) for p in r.get("points", [])]
+            rooms.append(
+                Room(
+                    name=r.get("name", "Room"), number=r.get("number", "1"), points=pts
+                )
+            )
+
+        furniture = [FurnitureItem(**f) for f in furniture_json]
+
+        plan = InteriorPlan(
+            title=title,
+            walls=walls,
+            rooms=rooms,
+            furniture=furniture,
+            language=language,
+            paper_format=paper_format,
+            scale=scale,
+            dpi=dpi,
+        )
+        svg_bytes = service.render_interior(
+            plan, output_path=output_path, output_format="svg"
+        )
+        return svg_bytes.decode("utf-8")
+    except Exception as e:
+        raise ValueError(f"draw_interior_plan_svg error: {e}") from e

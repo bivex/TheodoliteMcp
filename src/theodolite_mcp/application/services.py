@@ -55,18 +55,33 @@ class SurveyService:
     def process_theodolite_traverse(self, data: TraverseData) -> TraverseResult:
         return calculate_traverse(data)
 
-    def render_plot(self, plan: PlotPlan, output_path: Optional[str] = None) -> bytes:
-        return self._save_if_needed(render_plot_plan(plan), output_path)
+    def render_plot(
+        self,
+        plan: PlotPlan,
+        output_path: Optional[str] = None,
+        output_format: str = "png",
+    ) -> bytes:
+        return self._save_if_needed(render_plot_plan(plan, output_format), output_path)
 
     def render_profile(
-        self, plan: ProfilePlan, output_path: Optional[str] = None
+        self,
+        plan: ProfilePlan,
+        output_path: Optional[str] = None,
+        output_format: str = "png",
     ) -> bytes:
-        return self._save_if_needed(render_profile_plan(plan), output_path)
+        return self._save_if_needed(
+            render_profile_plan(plan, output_format), output_path
+        )
 
     def render_interior(
-        self, plan: InteriorPlan, output_path: Optional[str] = None
+        self,
+        plan: InteriorPlan,
+        output_path: Optional[str] = None,
+        output_format: str = "png",
     ) -> bytes:
-        return self._save_if_needed(render_interior_plan(plan), output_path)
+        return self._save_if_needed(
+            render_interior_plan(plan, output_format), output_path
+        )
 
     def export_dxf(self, plan: PlotPlan, output_path: str) -> str:
         return export_plan_to_dxf(plan, output_path)

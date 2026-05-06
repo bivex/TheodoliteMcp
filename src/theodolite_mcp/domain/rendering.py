@@ -9,6 +9,7 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 import matplotlib.patches as patches
 from matplotlib.font_manager import FontProperties
+from matplotlib.backends.backend_svg import FigureCanvasSVG
 import textwrap
 
 from theodolite_mcp.domain.models import (
@@ -2205,9 +2206,10 @@ def _draw_profile_table(fig, plan: ProfilePlan, pw_mm: float, ph_mm: float):
                 )
 
 
-def render_profile_plan(plan: ProfilePlan) -> bytes:
+def render_profile_plan(plan: ProfilePlan, output_format: str = "png") -> bytes:
     """
     Generates a professional longitudinal profile with vertical exaggeration.
+    Supports PNG and SVG output formats.
     """
     dpi = plan.dpi
     lang = plan.language or "ru"
@@ -2291,7 +2293,12 @@ def render_profile_plan(plan: ProfilePlan) -> bytes:
     )
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, facecolor="white")
+    if output_format.lower() == "svg":
+        fig.patch.set_facecolor("white")
+        canvas = FigureCanvasSVG(fig)
+        canvas.print_svg(buf)
+    else:
+        fig.savefig(buf, format="png", dpi=dpi, facecolor="white")
     buf.seek(0)
     return buf.getvalue()
 
@@ -2540,7 +2547,7 @@ def _draw_furniture(ax, items: List[FurnitureItem]):
             )
 
 
-def render_interior_plan(plan: InteriorPlan) -> bytes:
+def render_interior_plan(plan: InteriorPlan, output_format: str = "png") -> bytes:
     # Ensure hatch linewidth is set for thread safety (constant value)
     matplotlib.rcParams["hatch.linewidth"] = D
 
@@ -2648,12 +2655,17 @@ def render_interior_plan(plan: InteriorPlan) -> bytes:
     _draw_stamp(fig, plan, f"1:{scale_val}", pw_mm, ph_mm, lang=plan.language)
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, facecolor="white")
+    if output_format.lower() == "svg":
+        fig.patch.set_facecolor("white")
+        canvas = FigureCanvasSVG(fig)
+        canvas.print_svg(buf)
+    else:
+        fig.savefig(buf, format="png", dpi=dpi, facecolor="white")
     buf.seek(0)
     return buf.getvalue()
 
 
-def render_plot_plan(plan: PlotPlan) -> bytes:
+def render_plot_plan(plan: PlotPlan, output_format: str = "png") -> bytes:
     # Ensure hatch linewidth is set for thread safety (constant value)
     matplotlib.rcParams["hatch.linewidth"] = D
 
@@ -2819,6 +2831,11 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     _draw_stamp(fig, plan, scale_str, pw_mm, ph_mm, lang=lang)
 
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=dpi, facecolor="white")
+    if output_format.lower() == "svg":
+        fig.patch.set_facecolor("white")
+        canvas = FigureCanvasSVG(fig)
+        canvas.print_svg(buf)
+    else:
+        fig.savefig(buf, format="png", dpi=dpi, facecolor="white")
     buf.seek(0)
     return buf.getvalue()
