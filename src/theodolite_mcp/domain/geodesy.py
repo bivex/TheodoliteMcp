@@ -344,42 +344,62 @@ def mgrs_to_latlon(mgrs: str, ell: Ellipsoid = WGS84) -> Tuple[float, float]:
     """
     mgrs = mgrs.replace(" ", "").upper()
 
-    # Parse: zone number (1-2 digits), zone letter, 100km grid square, easting, northing
+    # 1. Parse: zone number (1-2 digits), zone letter, 100km grid square, easting/northing digits
     import re
-
-    match = re.match(r"(\d{1,2})([A-Z])([A-Z]{2})(\d+)(\d+)$", mgrs)
+    match = re.match(r'^(\d{1,2})([C-X])([A-Z][A-Z])(\d+)$', mgrs)
     if not match:
         raise ValueError(f"Invalid MGRS format: {mgrs}")
 
     zone_num = int(match.group(1))
     zone_letter = match.group(2)
     grid_sq = match.group(3)
-    easting_digits = match.group(4)
-    northing_digits = match.group(5)
+    digits = match.group(4)
 
-    # 100km grid square letters
-    col_letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"
-    row_letters = "ABCDEFGHJKLMNPQRSTUV"
+    if len(digits) % 2 != 0:
+        raise ValueError("Easting and Northing must have same number of digits")
 
-    col_idx = col_letters.index(grid_sq[0])
-    row_idx = row_letters.index(grid_sq[1])
+    precision = len(digits) // 2
+    easting_val = int(digits[:precision]) * (10**(5-precision))
+    northing_val = int(digits[precision:]) * (10**(5-precision))
 
-    # Calculate 100km grid origins
-    easting_100k = col_idx * 100000 + 100000  # False easting starts at 100km
-    northing_100k = row_idx * 100000
+    # 2. 100km Square Column (Easting)
+    # ALPHABET without I and O
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+    col_letter = grid_sq[0]
+    col_idx = alphabet.find(col_letter) + 1
+    # Column origin cycles every 3 zones: 1, 9, 17
+    col_origin = ((zone_num - 1) % 3) * 8 + 1
+    easting_base = (col_idx - col_origin) * 100000 + 500000
+    if easting_base < 100000: easting_base += 800000
+    if easting_base > 900000: easting_base -= 800000
 
-    # Adjust for zone letter (latitude bands)
+    # 3. 100km Square Row (Northing)
+    row_letter = grid_sq[1]
+    # Rows only use A-V (20 letters), no I, O
+    row_alphabet = "ABCDEFGHJKLMNPQRSTUV"
+    row_idx = row_alphabet.find(row_letter)
+    if row_idx == -1:
+        raise ValueError(f"Invalid row letter in MGRS grid square: {row_letter}")
+    
+    # Row offset depends on zone parity: 0 for odd, 5 for even zones
+    row_offset = 5 if zone_num % 2 == 0 else 0
+    northing_base = (row_idx - row_offset) * 100000
+    if northing_base < 0: northing_base += 2000000
+
+    # 4. Handle 2,000,000m Northing Ambiguity
+    # Use Latitude Band to find approximate northing
     zone_letters = "CDEFGHJKLMNPQRSTUVWXX"
-    lat_band_idx = zone_letters.index(zone_letter)
-    lat_band_min = -80 + lat_band_idx * 8
-    northing_100k += int(lat_band_min / 8) * 800000  # Approximate
-
-    # Combine 100km grid with given digits
-    easting = easting_100k + int(easting_digits) * (10 ** (5 - len(easting_digits)))
-    northing = northing_100k + int(northing_digits) * (10 ** (5 - len(northing_digits)))
+    band_idx = zone_letters.find(zone_letter)
+    # C is -80 deg, each band is 8 deg. 111,000 meters per degree approx.
+    approx_northing = (band_idx * 8 - 80) * 111319
+    if approx_northing < 0: approx_northing += 10000000 # Southern hemisphere offset
+    
+    # Adjust northing_base to the correct 2M block
+    block_count = round((approx_northing - northing_base) / 2000000)
+    northing_base += block_count * 2000000
 
     # Convert to lat/lon using UTM inverse
-    return utm_inverse(northing, easting, zone_num, zone_letter, ell)
+    return utm_inverse(northing_base + northing_val, easting_base + easting_val, zone_num, zone_letter, ell)
 
 
 def calculate_grid_convergence(

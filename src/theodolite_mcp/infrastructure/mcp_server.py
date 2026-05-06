@@ -17,6 +17,7 @@ from theodolite_mcp.domain.models import (
     Wall,
     Opening,
     Room,
+    FurnitureItem,
     AsBuiltPoint,
     VolumeGrid,
     GridCell,
@@ -295,19 +296,19 @@ def draw_plot_plan(
         ),
     ] = "Cadastral Plan",
     boundary_json: Annotated[
-        list[dict],
+        Optional[list[dict]],
         Field(
-            default=[],
+            default=None,
             description="List of boundary vertices as {x: float, y: float} dicts",
         ),
-    ] = [],
+    ] = None,
     zones_json: Annotated[
-        list[dict],
+        Optional[list[dict]],
         Field(
-            default=[],
+            default=None,
             description="List of zone definitions with name, points, and styling",
         ),
-    ] = [],
+    ] = None,
     language: Annotated[
         str,
         Field(
@@ -366,6 +367,10 @@ def draw_plot_plan(
     Returns a PNG image.
     Standard options: 'construction' (ISO 128-23), 'shipbuilding' (ISO 129-4).
     """
+    if boundary_json is None:
+        boundary_json = []
+    if zones_json is None:
+        zones_json = []
     boundary_points = [Point(**pt) for pt in boundary_json]
     zones = []
     for z in zones_json:
@@ -409,19 +414,19 @@ def mcp_export_to_dxf(
         ),
     ] = "Cadastral Plan",
     boundary_json: Annotated[
-        list[dict],
+        Optional[list[dict]],
         Field(
-            default=[],
+            default=None,
             description="List of boundary vertices as {x: float, y: float} dicts",
         ),
-    ] = [],
+    ] = None,
     zones_json: Annotated[
-        list[dict],
+        Optional[list[dict]],
         Field(
-            default=[],
+            default=None,
             description="List of zone definitions with name, points, and styling",
         ),
-    ] = [],
+    ] = None,
     filename: Annotated[
         str,
         Field(
@@ -439,6 +444,10 @@ def mcp_export_to_dxf(
     Saves the file locally in the 'output' directory and returns the full path.
     The output includes layers for BOUNDARY, POINTS, BUILDINGS, WATER, and GREEN zones.
     """
+    if boundary_json is None:
+        boundary_json = []
+    if zones_json is None:
+        zones_json = []
     boundary_points = [Point(**pt) for pt in boundary_json]
     zones = []
     for z in zones_json:
@@ -471,12 +480,12 @@ def draw_longitudinal_profile(
         str, Field(default="Longitudinal Profile", description="Profile title")
     ] = "Longitudinal Profile",
     points_json: Annotated[
-        list[dict],
+        Optional[list[dict]],
         Field(
-            default=[],
+            default=None,
             description="List of profile points with station, elevation, and optional design data",
         ),
-    ] = [],
+    ] = None,
     language: Annotated[
         str,
         Field(
@@ -498,6 +507,8 @@ def draw_longitudinal_profile(
     Generates a professional longitudinal profile (PNG) for pipelines or roads.
     Includes the 'podval' table with stations, distances, and elevations.
     """
+    if points_json is None:
+        points_json = []
     pts = [ProfilePoint(**p) for p in points_json]
     plan = ProfilePlan(
         title=title,
@@ -520,12 +531,12 @@ def mcp_export_profile_to_dxf(
         ),
     ] = "Longitudinal Profile",
     points_json: Annotated[
-        list[dict],
+        Optional[list[dict]],
         Field(
-            default=[],
+            default=None,
             description="List of profile points with station, elevation, and optional design data",
         ),
-    ] = [],
+    ] = None,
     filename: Annotated[
         str,
         Field(
@@ -545,6 +556,8 @@ def mcp_export_profile_to_dxf(
     Saves the file locally in the 'output' directory and returns the full path.
     Includes layers for GROUND, DESIGN, TABLE, and ORDINATES.
     """
+    if points_json is None:
+        points_json = []
     pts = [ProfilePoint(**p) for p in points_json]
     plan = ProfilePlan(title=title, points=pts, horiz_scale=h_scale, vert_scale=v_scale)
 
@@ -562,26 +575,26 @@ def draw_interior_plan(
         str, Field(default="Floor Plan", description="Architectural drawing title")
     ] = "Floor Plan",
     walls_json: Annotated[
-        list[dict],
+        Optional[list[dict]],
         Field(
-            default=[],
+            default=None,
             description="List of wall definitions with start_pt, end_pt, thickness, and openings",
         ),
-    ] = [],
+    ] = None,
     rooms_json: Annotated[
-        list[dict],
+        Optional[list[dict]],
         Field(
-            default=[],
+            default=None,
             description="List of room/polygon boundaries with points and labels",
         ),
-    ] = [],
+    ] = None,
     furniture_json: Annotated[
-        list[dict],
+        Optional[list[dict]],
         Field(
-            default=[],
+            default=None,
             description="List of furniture blocks (bed, sofa, wc, bath, sink, stove)",
         ),
-    ] = [],
+    ] = None,
     language: Annotated[
         str,
         Field(
@@ -606,6 +619,12 @@ def draw_interior_plan(
     IMPORTANT: All coordinates and dimensions MUST be in METERS.
     Supports walls with thickness, door/window openings, and furniture blocks (bed, sofa, wc, bath, sink, stove).
     """
+    if walls_json is None:
+        walls_json = []
+    if rooms_json is None:
+        rooms_json = []
+    if furniture_json is None:
+        furniture_json = []
     walls = []
     for w in walls_json:
         openings = [Opening(**op) for op in w.get("openings", [])]
@@ -627,13 +646,13 @@ def draw_interior_plan(
             Room(name=r.get("name", "Room"), number=r.get("number", "1"), points=pts)
         )
 
-    # furniture = [FurnitureItem(type=f["type"], center_pt=Point(**f["center_pt"]), width=f["width"], length=f["length"], rotation=f.get("rotation", 0.0)) for f in furniture_json]
+    furniture = [FurnitureItem(**f) for f in furniture_json]
 
     plan = InteriorPlan(
         title=title,
         walls=walls,
         rooms=rooms,
-        # furniture=furniture,
+        furniture=furniture,
         language=language,
         paper_format=paper_format,
         scale=scale,
@@ -648,12 +667,12 @@ def draw_construction_as_built_report(
         str, Field(default="As-Built Survey Report", description="Report title")
     ] = "As-Built Survey Report",
     as_built_points_json: Annotated[
-        list[dict],
+        Optional[list[dict]],
         Field(
-            default=[],
+            default=None,
             description="List of as-built survey points with design vs. as-built coordinates",
         ),
-    ] = [],
+    ] = None,
     volume_grid_json: Annotated[
         Optional[dict],
         Field(
@@ -676,6 +695,8 @@ def draw_construction_as_built_report(
     Generates a construction report showing deviations (plan/fact) and earthwork volumes.
     Returns a PNG image with deviation arrows and/or a volume cartogram.
     """
+    if as_built_points_json is None:
+        as_built_points_json = []
     pts = [AsBuiltPoint(**p) for p in as_built_points_json]
 
     v_grid = None

@@ -86,6 +86,9 @@ def adjust_network_2d(observations: List[ObservationLS], initial_coords: Dict[st
 
             elif obs.type == "angle":
                 # Angle at 'from_pt' between 'to_pt' and 'target_pt'
+                if obs.target_pt is None or obs.target_pt not in curr_coords:
+                    continue
+                
                 p_v = curr_coords[obs.from_pt] # Vertex
                 p_1 = curr_coords[obs.to_pt]   # Backsight
                 p_2 = curr_coords[obs.target_pt] # Foresight
@@ -101,7 +104,10 @@ def adjust_network_2d(observations: List[ObservationLS], initial_coords: Dict[st
                 angle_calc = az2 - az1
                 if angle_calc < 0: angle_calc += 360.0
                 
-                L.append(obs.value - angle_calc)
+                misc = obs.value - angle_calc
+                if misc > 180: misc -= 360
+                if misc < -180: misc += 360
+                L.append(misc)
                 P.append(1.0 / (obs.std_dev**2))
                 
                 row = np.zeros(2 * n_free)
@@ -132,6 +138,24 @@ def adjust_network_2d(observations: List[ObservationLS], initial_coords: Dict[st
                     row[2*idx+1] = (dx2 / dist2_2) * rho
                 
                 A.append(row)
+
+            elif obs.type == "fixed_x":
+                if obs.from_pt in free_pts:
+                    idx = free_pts.index(obs.from_pt)
+                    L.append(obs.value - curr_coords[obs.from_pt]['x'])
+                    P.append(1.0 / (obs.std_dev**2 if obs.std_dev > 0 else 1e-12))
+                    row = np.zeros(2 * n_free)
+                    row[2*idx] = 1.0
+                    A.append(row)
+
+            elif obs.type == "fixed_y":
+                if obs.from_pt in free_pts:
+                    idx = free_pts.index(obs.from_pt)
+                    L.append(obs.value - curr_coords[obs.from_pt]['y'])
+                    P.append(1.0 / (obs.std_dev**2 if obs.std_dev > 0 else 1e-12))
+                    row = np.zeros(2 * n_free)
+                    row[2*idx+1] = 1.0
+                    A.append(row)
         
         A = np.array(A)
         L = np.array(L)

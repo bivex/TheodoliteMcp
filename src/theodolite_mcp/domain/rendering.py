@@ -1,7 +1,7 @@
 import io
 import math
 import os
-from typing import List, Optional, Tuple, Dict
+from typing import List, Optional, Tuple, Dict, Union
 import matplotlib
 
 matplotlib.use("Agg")
@@ -74,28 +74,35 @@ def _format_coord_value(value: Optional[float], max_val: float = 5000.0) -> str:
 
 
 def _get_font(
-    size: float = 7, bold: bool = False, italic: bool = False, m_per_pt: float = 0.1
+    size: float = 7,
+    bold: bool = False,
+    italic: bool = False,
+    m_per_pt: float = 0.1,
+    lang: str = "ru",
 ):
     """
     Returns font properties for drawing text.
-    Font sizes are in points (pt) and represent on-paper size per ISO 3098.
-    They should NOT scale with m_per_pt to maintain consistent readability.
-    The m_per_pt parameter is accepted for API compatibility but ignored.
+    Includes fallback for CJK languages (zh, ja, ko) to avoid square boxes.
     """
     # Clamp to reasonable limits for readability
     adjusted_size = max(3.0, min(24.0, size))
+    weight = "bold" if bold else "normal"
+    style = "italic" if italic else "normal"
+
+    # CJK Fallback logic
+    if lang in ["zh", "ja", "ko"]:
+        # Try to find a common CJK font
+        cjk_families = [
+            "SimSun", "WenQuanYi Micro Hei", "Noto Sans CJK JP", 
+            "MS Gothic", "AppleGothic", "sans-serif"
+        ]
+        return FontProperties(family=cjk_families, size=adjusted_size, weight=weight, style=style)
 
     if os.path.exists(FONT_PATH):
-        weight = "bold" if bold else "normal"
-        style = "italic" if italic else "normal"
         return FontProperties(
             fname=FONT_PATH, size=adjusted_size, weight=weight, style=style
         )
-    return {
-        "fontsize": adjusted_size,
-        "fontweight": "bold" if bold else "normal",
-        "style": "italic" if italic else "normal",
-    }
+    return FontProperties(size=adjusted_size, weight=weight, style=style)
 
 
 D = 0.35 * MM_TO_PT  # Narrow (d)
@@ -202,6 +209,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "м",
         "bow": "НІС",
         "stern": "КОРМА",
+        "prof_depth": "Глибина закладення",
+        "prof_slope": "Ухили / Довжина",
+        "prof_design": "Проєктна позначка",
+        "prof_ground": "Позначка землі",
+        "prof_dist": "Відстань",
+        "prof_station": "Пікет",
     },
     "en": {
         "project": "Project:",
@@ -248,6 +261,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "m",
         "bow": "BUG",
         "stern": "HECK",
+        "prof_depth": "Verlegetiefe",
+        "prof_slope": "Gefälle / Länge",
+        "prof_design": "Planumshöhe",
+        "prof_ground": "Geländehöhe",
+        "prof_dist": "Abstand",
+        "prof_station": "Station",
     },
     "fr": {
         "project": "Projet :",
@@ -268,6 +287,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "m",
         "bow": "PROUE",
         "stern": "POUPE",
+        "prof_depth": "Profondeur d'enfouissement",
+        "prof_slope": "Pentes / Longueur",
+        "prof_design": "Niveau de conception",
+        "prof_ground": "Niveau du sol",
+        "prof_dist": "Distance",
+        "prof_station": "Piquet",
     },
     "es": {
         "project": "Proyecto:",
@@ -288,6 +313,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "m",
         "bow": "PROA",
         "stern": "POPA",
+        "prof_depth": "Profundidad de entierro",
+        "prof_slope": "Pendientes / Longitud",
+        "prof_design": "Nivel de diseño",
+        "prof_ground": "Nivel del suelo",
+        "prof_dist": "Distancia",
+        "prof_station": "Estación",
     },
     "it": {
         "project": "Progetto:",
@@ -308,6 +339,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "m",
         "bow": "PRUA",
         "stern": "POPPIA",
+        "prof_depth": "Profondità di interramento",
+        "prof_slope": "Pendenze / Lunghezza",
+        "prof_design": "Livello di progetto",
+        "prof_ground": "Livello del suolo",
+        "prof_dist": "Distanza",
+        "prof_station": "Stazione",
     },
     "pt": {
         "project": "Projeto:",
@@ -328,6 +365,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "m",
         "bow": "PROA",
         "stern": "POPA",
+        "prof_depth": "Profundidade de enterro",
+        "prof_slope": "Inclinações / Comprimento",
+        "prof_design": "Nível de projeto",
+        "prof_ground": "Nível do solo",
+        "prof_dist": "Distância",
+        "prof_station": "Estação",
     },
     "pl": {
         "project": "Projekt:",
@@ -348,6 +391,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "m",
         "bow": "DZIOB",
         "stern": "RUFA",
+        "prof_depth": "Głębokość posadowienia",
+        "prof_slope": "Nachylenia / Długość",
+        "prof_design": "Rzędna projektowana",
+        "prof_ground": "Rzędna terenu",
+        "prof_dist": "Odległość",
+        "prof_station": "Pikieta",
     },
     "tr": {
         "project": "Proje:",
@@ -368,6 +417,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "m",
         "bow": "BAŞ",
         "stern": "KIÇ",
+        "prof_depth": "Gömme Derinliği",
+        "prof_slope": "Eğimler / Uzunluk",
+        "prof_design": "Tasarım Kotu",
+        "prof_ground": "Zemin Kotu",
+        "prof_dist": "Mesafe",
+        "prof_station": "İstasyon",
     },
     "zh": {
         "project": "项目:",
@@ -388,6 +443,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "米",
         "bow": "船首",
         "stern": "船尾",
+        "prof_depth": "埋深",
+        "prof_slope": "坡度 / 长度",
+        "prof_design": "设计高程",
+        "prof_ground": "地面高程",
+        "prof_dist": "距离",
+        "prof_station": "里程",
     },
     "ja": {
         "project": "プロジェクト:",
@@ -408,6 +469,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "m",
         "bow": "船首",
         "stern": "船尾",
+        "prof_depth": "埋設深さ",
+        "prof_slope": "勾配 / 延長",
+        "prof_design": "設計計画高",
+        "prof_ground": "地盤高",
+        "prof_dist": "距離",
+        "prof_station": "追加距離",
     },
     "ko": {
         "project": "프로젝트:",
@@ -428,6 +495,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "m",
         "bow": "선수",
         "stern": "선미",
+        "prof_depth": "매설 깊이",
+        "prof_slope": "경사 / 길이",
+        "prof_design": "설계 고도",
+        "prof_ground": "지반 고도",
+        "prof_dist": "거리",
+        "prof_station": "측점",
     },
     "nl": {
         "project": "Project:",
@@ -468,6 +541,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "m",
         "bow": "FÖR",
         "stern": "AKTER",
+        "prof_depth": "Förläggningsdjup",
+        "prof_slope": "Lutningar / Längd",
+        "prof_design": "Projekterad nivå",
+        "prof_ground": "Marknivå",
+        "prof_dist": "Avstånd",
+        "prof_station": "Sektion",
     },
     "no": {
         "project": "Prosjekt:",
@@ -475,6 +554,208 @@ I18N: Dict[str, Dict[str, str]] = {
         "org": "Org:",
         "date": "Dato:",
         "stage": "Fase:",
+        "scale": "Skala:",
+        "draft": "Tegning (P)",
+        "explication": "SONEFORKLARING",
+        "total_area": "Totalt areal:",
+        "sotki": "enheter",
+        "num": "Nr.",
+        "name": "Beskrivelse",
+        "area_sqm": "S, m²",
+        "north": "N",
+        "others": "... og andre",
+        "unit_m": "m",
+        "bow": "BAV",
+        "stern": "HEKK",
+        "prof_depth": "Nedgravingdybde",
+        "prof_slope": "Hellinger / Lengde",
+        "prof_design": "Prosjektert nivå",
+        "prof_ground": "Terrengnivå",
+        "prof_dist": "Avstand",
+        "prof_station": "Stasjon",
+    },
+    "da": {
+        "project": "Projekt:",
+        "project_no": "Projekt nr:",
+        "org": "Org:",
+        "date": "Dato:",
+        "stage": "Fase:",
+        "scale": "Skala:",
+        "draft": "Tegning (P)",
+        "explication": "ZONEFORKLARING",
+        "total_area": "Samlet areal:",
+        "sotki": "enheder",
+        "num": "Nr.",
+        "name": "Beskrivelse",
+        "area_sqm": "S, m²",
+        "north": "N",
+        "others": "... og andre",
+        "unit_m": "m",
+        "bow": "BOV",
+        "stern": "AGTER",
+        "prof_depth": "Nedgravningsdybde",
+        "prof_slope": "Hældninger / Længde",
+        "prof_design": "Projekteret niveau",
+        "prof_ground": "Terrænniveau",
+        "prof_dist": "Afstand",
+        "prof_station": "Station",
+    },
+    "fi": {
+        "project": "Projekti:",
+        "project_no": "Projektin nro:",
+        "org": "Org:",
+        "date": "Päivämäärä:",
+        "stage": "Vaihe:",
+        "scale": "Mittakaava:",
+        "draft": "Piirustus (P)",
+        "explication": "ALUESELITYS",
+        "total_area": "Kokonaisala:",
+        "sotki": "yksikköä",
+        "num": "Nro",
+        "name": "Kuvaus",
+        "area_sqm": "S, m²",
+        "north": "P",
+        "others": "... ja muut",
+        "unit_m": "m",
+        "bow": "KEULA",
+        "stern": "PERÄ",
+        "prof_depth": "Upotussyvyys",
+        "prof_slope": "Kaltevuudet / Pituus",
+        "prof_design": "Suunnittelutaso",
+        "prof_ground": "Maanpinnan taso",
+        "prof_dist": "Etäisyys",
+        "prof_station": "Paalu",
+    },
+    "el": {
+        "project": "Έργο:",
+        "project_no": "Αρ. Έργου:",
+        "org": "Οργ:",
+        "date": "Ημερομηνία:",
+        "stage": "Στάδιο:",
+        "scale": "Κλίμακα:",
+        "draft": "Σχέδιο (P)",
+        "explication": "ΥΠΟΜΝΗΜΑ ΖΩΝΩΝ",
+        "total_area": "Συνολικό Εμβαδόν:",
+        "sotki": "μονάδες",
+        "num": "Αρ.",
+        "name": "Περιγραφή",
+        "area_sqm": "S, m²",
+        "north": "Β",
+        "others": "... και άλλα",
+        "unit_m": "m",
+        "bow": "ΠΛΩΡΗ",
+        "stern": "ΠΡΥΜΝΗ",
+        "prof_depth": "Βάθος Ταφής",
+        "prof_slope": "Κλίσεις / Μήκος",
+        "prof_design": "Στάθμη Σχεδιασμού",
+        "prof_ground": "Στάθμη Εδάφους",
+        "prof_dist": "Απόσταση",
+        "prof_station": "Σταθμός",
+    },
+    "cs": {
+        "project": "Projekt:",
+        "project_no": "Č. proj:",
+        "org": "Org:",
+        "date": "Datum:",
+        "stage": "Fáze:",
+        "scale": "Měřítko:",
+        "draft": "Výkres (P)",
+        "explication": "LEGENDA ZÓN",
+        "total_area": "Celková plocha:",
+        "sotki": "jedn.",
+        "num": "Č.",
+        "name": "Popis",
+        "area_sqm": "S, m²",
+        "north": "S",
+        "others": "... a další",
+        "unit_m": "m",
+        "bow": " příď",
+        "stern": "záď",
+        "prof_depth": "Hloubka uložení",
+        "prof_slope": "Spády / Délka",
+        "prof_design": "Projektovaná úroveň",
+        "prof_ground": "Úroveň terénu",
+        "prof_dist": "Vzdálenost",
+        "prof_station": "Staničení",
+    },
+    "hu": {
+        "project": "Projekt:",
+        "project_no": "Proj.sz:",
+        "org": "Szerv:",
+        "date": "Dátum:",
+        "stage": "Szakasz:",
+        "scale": "Lépték:",
+        "draft": "Rajz (P)",
+        "explication": "ZÓNA JELMAGYARÁZAT",
+        "total_area": "Összterület:",
+        "sotki": "egységek",
+        "num": "Sz.",
+        "name": "Megnevezés",
+        "area_sqm": "S, m²",
+        "north": "É",
+        "others": "... és egyebek",
+        "unit_m": "m",
+        "bow": "ORR",
+        "stern": "FAR",
+        "prof_depth": "Fektetési mélység",
+        "prof_slope": "Lejtések / Hossz",
+        "prof_design": "Tervezett szint",
+        "prof_ground": "Terepszint",
+        "prof_dist": "Távolság",
+        "prof_station": "Szelvény",
+    },
+    "ro": {
+        "project": "Proiect:",
+        "project_no": "Nr. Proj:",
+        "org": "Org:",
+        "date": "Data:",
+        "stage": "Stadiu:",
+        "scale": "Scara:",
+        "draft": "Desen (P)",
+        "explication": "LEGENDĂ ZONE",
+        "total_area": "Suprafață totală:",
+        "sotki": "unități",
+        "num": "Nr.",
+        "name": "Descriere",
+        "area_sqm": "S, m²",
+        "north": "N",
+        "others": "... și altele",
+        "unit_m": "m",
+        "bow": "PROVĂ",
+        "stern": "PUPĂ",
+        "prof_depth": "Adâncime de îngropare",
+        "prof_slope": "Pante / Lungime",
+        "prof_design": "Nivel proiectat",
+        "prof_ground": "Nivelul solului",
+        "prof_dist": "Distanță",
+        "prof_station": "Stație",
+    },
+    "bg": {
+        "project": "Проект:",
+        "project_no": "№ Проект:",
+        "org": "Орг:",
+        "date": "Дата:",
+        "stage": "Етап:",
+        "scale": "Мащаб:",
+        "draft": "Чертеж (П)",
+        "explication": "ЛЕГЕНДА ЗОНИ",
+        "total_area": "Обща площ:",
+        "sotki": "ед.",
+        "num": "№",
+        "name": "Наименование",
+        "area_sqm": "S, m²",
+        "north": "С",
+        "others": "... и други",
+        "unit_m": "m",
+        "bow": "НОС",
+        "stern": "КЪРМА",
+        "prof_depth": "Дълбочина на полагане",
+        "prof_slope": "Наклони / Дължина",
+        "prof_design": "Проектно ниво",
+        "prof_ground": "Ниво терен",
+        "prof_dist": "Разстояние",
+        "prof_station": "Пикет",
+    },
         "scale": "Skala:",
         "draft": "Tegning (P)",
         "explication": "SONEFORKLARING",
@@ -1420,7 +1701,12 @@ def _calculate_auto_scale(x_span: float, available_width_mm: float) -> int:
 
 
 def _draw_stamp(
-    fig, plan: PlotPlan, scale_str: str, pw_mm: float, ph_mm: float, lang: str = "ru"
+    fig,
+    plan: Union[PlotPlan, ProfilePlan, InteriorPlan],
+    scale_str: str,
+    pw_mm: float,
+    ph_mm: float,
+    lang: str = "ru",
 ):
     texts = I18N.get(lang, I18N["ru"])
     # ISO 7200 Title Block - Absolute positioning in mm
@@ -1451,26 +1737,26 @@ def _draw_stamp(
         0.02,
         0.9,
         texts["project_no"],
-        fontproperties=_get_font(6.5, italic=True),
+        fontproperties=_get_font(6.5, italic=True, lang=lang),
         va="center",
     )
     ax_stamp.text(
         0.22,
         0.9,
         plan.project_number,
-        fontproperties=_get_font(7.5, bold=True),
+        fontproperties=_get_font(7.5, bold=True, lang=lang),
         va="center",
     )
 
     # Row 2: Organization
     ax_stamp.text(
-        0.02, 0.7, texts["org"], fontproperties=_get_font(6.5, italic=True), va="center"
+        0.02, 0.7, texts["org"], fontproperties=_get_font(6.5, italic=True, lang=lang), va="center"
     )
     ax_stamp.text(
         0.22,
         0.7,
         plan.organization,
-        fontproperties=_get_font(7.5, bold=True),
+        fontproperties=_get_font(7.5, bold=True, lang=lang),
         va="center",
     )
 
@@ -1479,12 +1765,12 @@ def _draw_stamp(
         0.02,
         0.5,
         texts["project"],
-        fontproperties=_get_font(6.5, italic=True),
+        fontproperties=_get_font(6.5, italic=True, lang=lang),
         va="center",
     )
     wrapped_title = "\n".join(textwrap.wrap(plan.title, width=45))
     ax_stamp.text(
-        0.22, 0.5, wrapped_title, fontproperties=_get_font(7.5, bold=True), va="center"
+        0.22, 0.5, wrapped_title, fontproperties=_get_font(7.5, bold=True, lang=lang), va="center"
     )
 
     # Row 4: Date, Stage, Scale
@@ -1492,10 +1778,10 @@ def _draw_stamp(
         0.02,
         0.3,
         texts["date"],
-        fontproperties=_get_font(6.5, italic=True),
+        fontproperties=_get_font(6.5, italic=True, lang=lang),
         va="center",
     )
-    ax_stamp.text(0.22, 0.3, plan.date, fontproperties=_get_font(6.5), va="center")
+    ax_stamp.text(0.22, 0.3, plan.date, fontproperties=_get_font(6.5, lang=lang), va="center")
 
     # Scale box
     ax_stamp.axvline(0.5, ymin=0, ymax=0.4, color="black", lw=D)
@@ -1503,11 +1789,11 @@ def _draw_stamp(
         0.52,
         0.3,
         texts["scale"],
-        fontproperties=_get_font(6.5, italic=True),
+        fontproperties=_get_font(6.5, italic=True, lang=lang),
         va="center",
     )
     ax_stamp.text(
-        0.75, 0.3, scale_str, fontproperties=_get_font(7.5, bold=True), va="center"
+        0.75, 0.3, scale_str, fontproperties=_get_font(7.5, bold=True, lang=lang), va="center"
     )
 
     # Row 5: Drawing Name
@@ -1515,11 +1801,11 @@ def _draw_stamp(
         0.02,
         0.1,
         texts["draft"],
-        fontproperties=_get_font(6.5, italic=True),
+        fontproperties=_get_font(6.5, italic=True, lang=lang),
         va="center",
     )
     ax_stamp.text(
-        0.22, 0.1, plan.title, fontproperties=_get_font(7.5, bold=True), va="center"
+        0.22, 0.1, plan.title, fontproperties=_get_font(7.5, bold=True, lang=lang), va="center"
     )
 
 
@@ -2537,7 +2823,6 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
         all_points.extend(zone.points)
 
     if not all_points:
-        fig.savefig(io.BytesIO(), format="png")
         return b""
 
     xs, ys = [p.x for p in all_points], [p.y for p in all_points]
