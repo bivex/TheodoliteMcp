@@ -240,7 +240,7 @@ def calculate_traverse(data: TraverseData) -> TraverseResult:
         cy += dys[i]
         points.append(Point(name=traverse_obs[i].point_name, x=cx, y=cy))
 
-    # 8. Final Area & Status
+    # 7. Final Area & Status
     area = calculate_area(points[:-1] if data.is_closed else points)
     status = evaluate_precision(relative_precision)
 

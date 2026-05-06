@@ -59,8 +59,8 @@ class SurveyService:
         
         return {"lat": lat_l, "lon": lon_l, "h": h_l}
 
-    def project_to_grid(self, lat: float, lon: float, lat0: float, lon0: float, 
+    def project_to_grid(self, lat: float, lon: float, lon0: float, 
                         ellipsoid=KRASOVSKY) -> Dict[str, float]:
         """Gauss-Krüger projection to X, Y (Northing/Easting)."""
-        x, y = gauss_kruger_forward(lat, lon, lat0, lon0, ell=ellipsoid)
+        x, y = gauss_kruger_forward(lat, lon, lon0, ell=ellipsoid)
         return {"x": x, "y": y}

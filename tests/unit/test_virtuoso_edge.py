@@ -85,7 +85,7 @@ def test_gauss_kruger_on_meridian():
     lat = 50.0
     lon = 30.0
     cm = 30.0
-    x, y = gauss_kruger_forward(lat, lon, 0.0, cm)
+    x, y = gauss_kruger_forward(lat, lon, cm)
     # Y (Easting) should be false easting of 500,000 m on central meridian
     assert pytest.approx(y, abs=1e-3) == 500000.0
     # X (Northing) should be > 0

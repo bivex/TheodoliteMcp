@@ -176,6 +176,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "м",
         "bow": "НОС",
         "stern": "КОРМА",
+        "prof_depth": "Глубина заложения",
+        "prof_slope": "Уклоны / Длина",
+        "prof_design": "Проектная отметка",
+        "prof_ground": "Отметка земли",
+        "prof_dist": "Расстояние",
+        "prof_station": "Пикет",
     },
     "uk": {
         "project": "Проєкт:",
@@ -216,6 +222,12 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "m",
         "bow": "BOW",
         "stern": "STERN",
+        "prof_depth": "Burial Depth",
+        "prof_slope": "Slopes / Length",
+        "prof_design": "Design Level",
+        "prof_ground": "Ground Level",
+        "prof_dist": "Distance",
+        "prof_station": "Station",
     },
     "de": {
         "project": "Projekt:",
@@ -1875,14 +1887,17 @@ def _draw_profile_table(fig, plan: ProfilePlan, pw_mm: float, ph_mm: float):
     table_w = pw_mm - MARGIN_LEFT - MARGIN_OTHER - STAMP_WIDTH - 10
     row_h = 8.0
     headers_w = 40.0
+    
+    lang = plan.language if plan.language in I18N else "ru"
+    txt = I18N[lang]
 
     rows = [
-        {"id": "depth", "label": "Глубина заложения"},
-        {"id": "slope", "label": "Уклоны / Длина"},
-        {"id": "design_z", "label": "Проектная отметка"},
-        {"id": "ground_z", "label": "Отметка земли"},
-        {"id": "dist", "label": "Расстояние"},
-        {"id": "station", "label": "Пикет"},
+        {"id": "depth", "label": txt.get("prof_depth", "Depth")},
+        {"id": "slope", "label": txt.get("prof_slope", "Slopes")},
+        {"id": "design_z", "label": txt.get("prof_design", "Design Z")},
+        {"id": "ground_z", "label": txt.get("prof_ground", "Ground Z")},
+        {"id": "dist", "label": txt.get("prof_dist", "Distance")},
+        {"id": "station", "label": txt.get("prof_station", "Station")},
     ]
 
     table_h = len(rows) * row_h
@@ -1996,7 +2011,7 @@ def _draw_profile_table(fig, plan: ProfilePlan, pw_mm: float, ph_mm: float):
                 slope_promille = (dz / dx) * 1000
 
                 # Draw diagonal slope line
-                y_base = 4.0 / len(rows)
+                y_base = 4.5 / len(rows)
                 y_delta = 0.3 / len(rows)
                 if dz > 0:  # Up
                     ax_table.plot(
@@ -2417,7 +2432,6 @@ def render_interior_plan(plan: InteriorPlan) -> bytes:
         all_pts.extend(rm.points)
 
     if not all_pts:
-        fig.savefig(io.BytesIO(), format="png")
         return b""
 
     xs, ys = [p.x for p in all_pts], [p.y for p in all_pts]
@@ -2449,8 +2463,8 @@ def render_interior_plan(plan: InteriorPlan) -> bytes:
 
     _draw_walls(ax, plan.walls)
 
-    # if plan.furniture:
-    #     _draw_furniture(ax, plan.furniture)
+    if plan.furniture:
+        _draw_furniture(ax, plan.furniture)
 
     # 3.2 Draw Room Labels (Number and Area) with scaled fonts
     for rm in plan.rooms:

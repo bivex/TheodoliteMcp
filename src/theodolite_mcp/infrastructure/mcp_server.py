@@ -215,11 +215,11 @@ def adjust_traverse_network(
         ),
     ] = None,
     observations_json: Annotated[
-        list[dict],
+        Optional[list[dict]],
         Field(
-            default=[], description="List of traverse observations (angles, distances)"
+            default=None, description="List of traverse observations (angles, distances)"
         ),
-    ] = [],
+    ] = None,
     is_closed: Annotated[
         bool, Field(default=False, description="Whether the traverse is a closed loop")
     ] = False,
@@ -257,6 +257,8 @@ def adjust_traverse_network(
     Performs Bowditch (Compass Rule) adjustment on a traverse network with geodetic corrections.
     Includes support for closed loops and open traverses between known azimuths.
     """
+    if observations_json is None:
+        observations_json = []
     observations = [Observation(**obs) for obs in observations_json]
     start_point = Point(name=start_name, x=start_x, y=start_y, z=start_z)
 
@@ -399,7 +401,7 @@ def draw_plot_plan(
 
 
 @mcp.tool()
-def export_to_dxf(
+def mcp_export_to_dxf(
     title: Annotated[
         str,
         Field(
@@ -510,7 +512,7 @@ def draw_longitudinal_profile(
 
 
 @mcp.tool()
-def export_profile_to_dxf(
+def mcp_export_profile_to_dxf(
     title: Annotated[
         str,
         Field(
@@ -771,7 +773,7 @@ def project_coordinates_gauss_kruger(
     Projects geodetic coordinates to Gauss-Krüger (X, Y) grid.
     Uses Krasovsky ellipsoid (standard for S-42/USK-2000).
     """
-    return service.project_to_grid(lat, lon, 0.0, central_meridian)
+    return service.project_to_grid(lat, lon, central_meridian)
 
 
 # ========== Military Geodesy Tools ==========
@@ -869,7 +871,7 @@ def compute_grid_convergence(
     Grid Azimuth = True Azimuth - Grid Convergence.
     Positive = grid north is east of true north.
     """
-    return round(calculate_grid_convergence(lat, lon, central_meridian, KRASOVSKY), 6)
+    return round(calculate_grid_convergence(lat, lon, central_meridian, WGS84), 6)
 
 
 @mcp.tool()

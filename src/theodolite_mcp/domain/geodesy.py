@@ -94,14 +94,21 @@ def ecef_to_geodetic(
     h = 0.0  # Initialize h
     for _ in range(5):
         n = ell.a / math.sqrt(1 - ell.e2 * math.sin(phi) ** 2)
-        h = p / math.cos(phi) - n
+        
+        cos_phi = math.cos(phi)
+        if abs(cos_phi) < 1e-10:  # Check for near-polar case
+            h = abs(z) + n * ell.e2 - n # Approximation for poles
+            # In this case, phi is already very close to +/- PI/2, so the next phi calculation
+            # using atan2 is robust.
+        else:
+            h = p / cos_phi - n
         phi = math.atan2(z, p * (1 - ell.e2 * (n / (n + h))))
 
     return math.degrees(phi), math.degrees(lam), h
 
 
 def gauss_kruger_forward(
-    lat: float, lon: float, lat0: float, lon0: float, ell: Ellipsoid = KRASOVSKY
+    lat: float, lon: float, lon0: float, ell: Ellipsoid = KRASOVSKY
 ) -> Tuple[float, float]:
     """
     Simplified Gauss-Krüger Forward Projection.
@@ -182,7 +189,7 @@ def utm_forward(
     B = (3 * a * n / 2) * (1 - n + (7 / 8) * (n2 - n3) + (55 / 64) * (n4 - n5))
     C = (15 * a * n2 / 16) * (1 - n + (3 / 4) * (n2 - n3))
     D = (35 * a * n3 / 48) * (1 - n + (11 / 16) * (n2 - n3))
-    E = (315 * a * n4 / 51) * (1 - n)
+    E = (315 * a * n4 / 512) * (1 - n)
 
     S = (
         A * phi
@@ -292,7 +299,7 @@ def utm_inverse(
     B = (3 * a * n / 2) * (1 - n + (7 / 8) * (n2 - n3) + (55 / 64) * (n4 - n5))
     C = (15 * a * n2 / 16) * (1 - n + (3 / 4) * (n2 - n3))
     D = (35 * a * n3 / 48) * (1 - n + (11 / 16) * (n2 - n3))
-    E = (315 * a * n4 / 51) * (1 - n)
+    E = (315 * a * n4 / 512) * (1 - n)
 
     mu = M / A
     phi = mu
@@ -455,7 +462,7 @@ def sk42_to_wgs84(
     Returns: (lat, lon, h)
     """
     # First convert SK-42 grid to Krassovsky geodetic
-    lat_kr, lon_kr = gauss_kruger_inverse(northing, easting, zone, KRASOVSKY)
+    lat_kr, lon_kr = gauss_kruger_inverse(northing, easting, zone * 6 - 183, KRASOVSKY)
 
     # Then transform to WGS84 using Helmert
     x, y, z = geodetic_to_ecef(lat_kr, lon_kr, 0.0, KRASOVSKY)
@@ -499,7 +506,7 @@ def gauss_kruger_inverse(
     B = (3 * a * n / 2) * (1 - n + (7 / 8) * (n2 - n3) + (55 / 64) * (n4 - n5))
     C = (15 * a * n2 / 16) * (1 - n + (3 / 4) * (n2 - n3))
     D = (35 * a * n3 / 48) * (1 - n + (11 / 16) * (n2 - n3))
-    E = (315 * a * n4 / 51) * (1 - n)
+    E = (315 * a * n4 / 512) * (1 - n)
 
     # Footprint latitude
     mu = x / A

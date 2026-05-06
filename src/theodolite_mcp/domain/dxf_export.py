@@ -93,7 +93,7 @@ def export_profile_to_dxf(plan: ProfilePlan, output_path: str):
         
         # Table labels (Vertical)
         msp.add_text(f"{p.ground_z:.2f}", dxfattribs={'layer': 'V-PROF-TEXT', 'height': 0.5, 'rotation': 90}).set_placement((p.station + 0.2, y_table_top - 5))
-        if p.design_z:
+        if p.design_z is not None:
              msp.add_text(f"{p.design_z:.2f}", dxfattribs={'layer': 'V-PROF-TEXT', 'height': 0.5, 'rotation': 90, 'color': 1}).set_placement((p.station + 0.8, y_table_top - 5))
              
     # Table borders

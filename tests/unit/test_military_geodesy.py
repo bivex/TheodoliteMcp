@@ -25,7 +25,7 @@ from theodolite_mcp.domain.models import Point, EDMParameters
 def test_gauss_kruger_basic_projection():
     """Test basic Gauss-Krüger projection (military grid foundation)"""
     # Equator, prime meridian, central meridian 0
-    x, y = gauss_kruger_forward(lat=0.0, lon=0.0, lat0=0.0, lon0=0.0, ell=KRASOVSKY)
+    x, y = gauss_kruger_forward(lat=0.0, lon=0.0, lon0=0.0, ell=KRASOVSKY)
     assert x == pytest.approx(0.0, abs=1e-6)
     # Standard false easting of 500,000 m applied
     assert y == pytest.approx(500000.0, abs=1e-6)
@@ -35,7 +35,7 @@ def test_gauss_kruger_moscow_zone7():
     """Test Gauss-Krüger projection for Moscow (Zone 7, central meridian 39°E)"""
     # Moscow coordinates: 55.7558°N, 37.6173°E
     x, y = gauss_kruger_forward(
-        lat=55.7558, lon=37.6173, lat0=55.7558, lon0=39.0, ell=KRASOVSKY
+        lat=55.7558, lon=37.6173, lon0=39.0, ell=KRASOVSKY
     )
     # Northing for 55°N should exceed 6,000,000m
     assert x > 6_000_000

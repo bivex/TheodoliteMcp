@@ -83,6 +83,55 @@ def adjust_network_2d(observations: List[ObservationLS], initial_coords: Dict[st
                     row[2*idx] = (-dy / dist2) * rho
                     row[2*idx+1] = (dx / dist2) * rho
                 A.append(row)
+
+            elif obs.type == "angle":
+                # Angle at 'from_pt' between 'to_pt' and 'target_pt'
+                p_v = curr_coords[obs.from_pt] # Vertex
+                p_1 = curr_coords[obs.to_pt]   # Backsight
+                p_2 = curr_coords[obs.target_pt] # Foresight
+                
+                dx1, dy1 = p_1['x'] - p_v['x'], p_1['y'] - p_v['y']
+                dx2, dy2 = p_2['x'] - p_v['x'], p_2['y'] - p_v['y']
+                
+                dist1_2 = dx1**2 + dy1**2
+                dist2_2 = dx2**2 + dy2**2
+                
+                az1 = math.degrees(math.atan2(dy1, dx1))
+                az2 = math.degrees(math.atan2(dy2, dx2))
+                angle_calc = az2 - az1
+                if angle_calc < 0: angle_calc += 360.0
+                
+                L.append(obs.value - angle_calc)
+                P.append(1.0 / (obs.std_dev**2))
+                
+                row = np.zeros(2 * n_free)
+                rho = 180.0 / math.pi
+                
+                # Derivatives for vertex (from_pt)
+                if obs.from_pt in free_pts:
+                    idx = free_pts.index(obs.from_pt)
+                    # dAng/dxv = dAz2/dxv - dAz1/dxv = (dy2/dist2_2) - (dy1/dist1_2)
+                    row[2*idx] = (dy2 / dist2_2 - dy1 / dist1_2) * rho
+                    # dAng/dyv = dAz2/dyv - dAz1/dyv = (-dx2/dist2_2) - (-dx1/dist1_2)
+                    row[2*idx+1] = (-dx2 / dist2_2 + dx1 / dist1_2) * rho
+                
+                # Derivatives for backsight (to_pt)
+                if obs.to_pt in free_pts:
+                    idx = free_pts.index(obs.to_pt)
+                    # dAng/dx1 = -dAz1/dx1 = -(-dy1/dist1_2) = dy1/dist1_2
+                    row[2*idx] = (dy1 / dist1_2) * rho
+                    # dAng/dy1 = -dAz1/dy1 = -(dx1/dist1_2) = -dx1/dist1_2
+                    row[2*idx+1] = (-dx1 / dist1_2) * rho
+                
+                # Derivatives for foresight (target_pt)
+                if obs.target_pt in free_pts:
+                    idx = free_pts.index(obs.target_pt)
+                    # dAng/dx2 = dAz2/dx2 = -dy2/dist2_2
+                    row[2*idx] = (-dy2 / dist2_2) * rho
+                    # dAng/dy2 = dAz2/dy2 = dx2/dist2_2
+                    row[2*idx+1] = (dx2 / dist2_2) * rho
+                
+                A.append(row)
         
         A = np.array(A)
         L = np.array(L)

@@ -151,7 +151,7 @@ def test_gauss_kruger_inverse_basic():
     lat, lon = 55.75, 37.62
     central_meridian = 39.0
     
-    x, y = gauss_kruger_forward(lat, lon, lat, central_meridian, KRASOVSKY)
+    x, y = gauss_kruger_forward(lat, lon, central_meridian, KRASOVSKY)
     
     lat2, lon2 = gauss_kruger_inverse(x, y, central_meridian, KRASOVSKY)
     
@@ -168,7 +168,7 @@ def test_gauss_kruger_roundtrip():
     ]
     
     for lat, lon, lon0 in test_points:
-        x, y = gauss_kruger_forward(lat, lon, lat, lon0, KRASOVSKY)
+        x, y = gauss_kruger_forward(lat, lon, lon0, KRASOVSKY)
         lat2, lon2 = gauss_kruger_inverse(x, y, lon0, KRASOVSKY)
         
         assert lat2 == pytest.approx(lat, abs=1e-1)
@@ -181,7 +181,7 @@ def test_utm_vs_gauss_kruger():
     
     utm_n, utm_e, zone, letter = utm_forward(lat, lon, WGS84)
     
-    gk_x, gk_y = gauss_kruger_forward(lat, lon, lat, 39.0, KRASOVSKY)
+    gk_x, gk_y = gauss_kruger_forward(lat, lon, 39.0, KRASOVSKY)
     
     assert utm_n > 0
     assert utm_e > 0

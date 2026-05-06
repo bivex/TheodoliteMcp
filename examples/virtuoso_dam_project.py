@@ -16,8 +16,8 @@ def run_virtuoso_dam_project():
     gnss_p2 = {"lat": 50.450500, "lon": 30.500800}
 
     # Project to Local Gauss-Kruger (X, Y)
-    x1, y1 = gauss_kruger_forward(gnss_p1["lat"], gnss_p1["lon"], 0.0, cm, ell=KRASOVSKY)
-    x2, y2 = gauss_kruger_forward(gnss_p2["lat"], gnss_p2["lon"], 0.0, cm, ell=KRASOVSKY)
+    x1, y1 = gauss_kruger_forward(gnss_p1["lat"], gnss_p1["lon"], cm, ell=KRASOVSKY)
+    x2, y2 = gauss_kruger_forward(gnss_p2["lat"], gnss_p2["lon"], cm, ell=KRASOVSKY)
 
     print(f"📍 Control P1 (Local Grid): X={x1:.3f}, Y={y1:.3f}")
     print(f"📍 Control P2 (Local Grid): X={x2:.3f}, Y={y2:.3f}")
