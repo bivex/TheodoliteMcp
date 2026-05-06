@@ -836,24 +836,39 @@ def _draw_zones(
         zx, zy = _centroid(zone.points)
 
         if area < 0.5 or standard == "shipbuilding":
-            # Direction: push label away from drawing center
+            leader_len = 5.0 * MM_TO_PT * m_per_pt
+            label = str(i + 1)
             dx = zx - draw_cx
             dy = zy - draw_cy
             dist = math.hypot(dx, dy)
-            if dist > 0:
-                off_x = dx / dist * 5
-                off_y = dy / dist * 5
-            else:
-                # Alternate direction for coincident zones
-                angle = i * 2.4
-                off_x = math.cos(angle) * 5
-                off_y = math.sin(angle) * 5
+            base_angle = math.atan2(dy, dx) if dist > 0 else i * 2.4
+
+            # Pre-select leader angle to avoid shelf text collisions
+            shelf_len = (len(label) * 1.8 + 2.0) * MM_TO_PT * m_per_pt
+            d_m = D * m_per_pt
+            best_angle = base_angle
+            if tracker:
+                for ao in [0, 0.4, -0.4, 0.8, -0.8, 1.2, -1.2, math.pi]:
+                    a = base_angle + ao
+                    ox = math.cos(a) * leader_len
+                    oy = math.sin(a) * leader_len
+                    lx, ly = zx + ox, zy + oy
+                    sdir = 1 if ox >= 0 else -1
+                    tx = lx + sdir * shelf_len / 2
+                    ty = ly + 2 * d_m
+                    tb = tracker.text_bounds(tx, ty, label, 8, m_per_pt)
+                    if not tracker.collides(tb):
+                        best_angle = a
+                        break
+
+            off_x = math.cos(best_angle) * leader_len
+            off_y = math.sin(best_angle) * leader_len
 
             _draw_leader(
                 ax,
                 zx,
                 zy,
-                str(i + 1),
+                label,
                 offset_x=off_x,
                 offset_y=off_y,
                 terminator="dot",
@@ -866,17 +881,31 @@ def _draw_zones(
             if tracker:
                 box = tracker.text_bounds(zx, zy, label_text, 8.5, m_per_pt)
                 if tracker.collides(box):
-                    # Fall back to leader
+                    # Fall back to leader with predictive angle selection
+                    leader_len = 5.0 * MM_TO_PT * m_per_pt
                     dx = zx - draw_cx
                     dy = zy - draw_cy
                     dist = math.hypot(dx, dy)
-                    if dist > 0:
-                        off_x = dx / dist * 5
-                        off_y = dy / dist * 5
-                    else:
-                        angle = i * 2.4
-                        off_x = math.cos(angle) * 5
-                        off_y = math.sin(angle) * 5
+                    base_angle = math.atan2(dy, dx) if dist > 0 else i * 2.4
+
+                    shelf_len = (len(label_text) * 1.8 + 2.0) * MM_TO_PT * m_per_pt
+                    d_m = D * m_per_pt
+                    best_angle = base_angle
+                    for ao in [0, 0.4, -0.4, 0.8, -0.8, 1.2, -1.2, math.pi]:
+                        a = base_angle + ao
+                        ox = math.cos(a) * leader_len
+                        oy = math.sin(a) * leader_len
+                        lx, ly = zx + ox, zy + oy
+                        sdir = 1 if ox >= 0 else -1
+                        tx = lx + sdir * shelf_len / 2
+                        ty = ly + 2 * d_m
+                        tb = tracker.text_bounds(tx, ty, label_text, 8, m_per_pt)
+                        if not tracker.collides(tb):
+                            best_angle = a
+                            break
+
+                    off_x = math.cos(best_angle) * leader_len
+                    off_y = math.sin(best_angle) * leader_len
                     _draw_leader(
                         ax,
                         zx,
@@ -996,29 +1025,19 @@ def _draw_leader(
     # 3. Reference line (Shelf) - strictly horizontal
     shelf_dir = 1 if offset_x >= 0 else -1
 
-    # Check shelf text collision and try flipping direction
+    # Check shelf text collision — only flip shelf direction, never shift vertically
+    # (caller pre-screens leader angles to avoid collisions)
     text_x = lx + shelf_dir * shelf_len / 2
     text_y = ly + 2 * d_m
     if tracker:
         text_box = tracker.text_bounds(text_x, text_y, text, fontsize, m_per_pt)
         if tracker.collides(text_box):
-            # Try opposite shelf direction
             alt_dir = -shelf_dir
             alt_text_x = lx + alt_dir * shelf_len / 2
             alt_box = tracker.text_bounds(alt_text_x, text_y, text, fontsize, m_per_pt)
             if not tracker.collides(alt_box):
                 shelf_dir = alt_dir
                 text_x = alt_text_x
-            else:
-                # Try shifting vertically
-                for shift in [1.5, -1.5, 3.0, -3.0]:
-                    shifted_y = ly + shift * MM_TO_PT * m_per_pt
-                    shifted_box = tracker.text_bounds(
-                        text_x, shifted_y, text, fontsize, m_per_pt
-                    )
-                    if not tracker.collides(shifted_box):
-                        text_y = shifted_y
-                        break
 
     ax.plot(
         [lx, lx + shelf_dir * shelf_len],
