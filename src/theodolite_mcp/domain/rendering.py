@@ -50,7 +50,8 @@ STAMP_WIDTH = 185.0
 STAMP_HEIGHT = 55.0
 
 # Font handling (ISO 3098)
-FONT_PATH = os.path.join(os.path.dirname(__file__), "osifont.ttf")
+# Use DejaVu Sans (bundled with matplotlib) for broad language support.
+# It includes Cyrillic, Greek, and many glyphs. CJK languages use specific fallbacks.
 
 
 def _format_coord_value(value: Optional[float], max_val: float = 5000.0) -> str:
@@ -93,20 +94,25 @@ def _get_font(
     if lang in ["zh", "ja", "ko"]:
         # Try to find a common CJK font
         cjk_families = [
-            "SimSun", "WenQuanYi Micro Hei", "Noto Sans CJK JP", 
-            "MS Gothic", "AppleGothic", "sans-serif"
+            "SimSun",
+            "WenQuanYi Micro Hei",
+            "Noto Sans CJK JP",
+            "MS Gothic",
+            "AppleGothic",
+            "sans-serif",
         ]
-        return FontProperties(family=cjk_families, size=adjusted_size, weight=weight, style=style)
-
-    if os.path.exists(FONT_PATH):
         return FontProperties(
-            fname=FONT_PATH, size=adjusted_size, weight=weight, style=style
+            family=cjk_families, size=adjusted_size, weight=weight, style=style
         )
-    return FontProperties(size=adjusted_size, weight=weight, style=style)
+
+    # Use DejaVu Sans (bundled with matplotlib) for broad coverage (Cyrillic, Greek, etc.)
+    # This is portable and works in pip-installed environments.
+    return FontProperties(
+        family="DejaVu Sans", size=adjusted_size, weight=weight, style=style
+    )
 
 
 D = 0.35 * MM_TO_PT  # Narrow (d)
-matplotlib.rcParams["hatch.linewidth"] = D  # ISO 128-50
 D_WIDE = 0.7 * MM_TO_PT  # Wide (2d)
 D_EXTRA_WIDE = 1.4 * MM_TO_PT  # Extra-wide (4d)
 D_SYMBOL = 0.5 * MM_TO_PT  # Graphical Symbols
@@ -125,6 +131,7 @@ TYPE_04 = (0, (LD, GP, DT, GP))  # Long dashed dotted
 TYPE_05 = (0, (LD, GP, DT, GP, DT, GP))  # Long dashed double-dotted
 # ISO 128-25: 01+03 (Railway line) for tight bulkheads - approximated as a wide dashed-dotted or similar
 TYPE_RAILWAY = (0, (DS, DT, DS, DT))
+
 
 # Localization Dictionary
 class LabelTracker:
@@ -749,166 +756,6 @@ I18N: Dict[str, Dict[str, str]] = {
         "unit_m": "m",
         "bow": "НОС",
         "stern": "КЪРМА",
-        "prof_depth": "Дълбочина на полагане",
-        "prof_slope": "Наклони / Дължина",
-        "prof_design": "Проектно ниво",
-        "prof_ground": "Ниво терен",
-        "prof_dist": "Разстояние",
-        "prof_station": "Пикет",
-    },
-        "scale": "Skala:",
-        "draft": "Tegning (P)",
-        "explication": "SONEFORKLARING",
-        "total_area": "Totalareal:",
-        "sotki": "enheter",
-        "num": "Nr",
-        "name": "Beskrivelse",
-        "area_sqm": "S, m²",
-        "north": "N",
-        "others": "... og andre",
-        "unit_m": "m",
-        "bow": "BAU",
-        "stern": "HEKK",
-    },
-    "da": {
-        "project": "Projekt:",
-        "project_no": "Projekt nr.:",
-        "org": "Org.:",
-        "date": "Dato:",
-        "stage": "Fase:",
-        "scale": "Skala:",
-        "draft": "Tegning (P)",
-        "explication": "ZONEFORKLARING",
-        "total_area": "Samlet areal:",
-        "sotki": "enheder",
-        "num": "Nr.",
-        "name": "Beskrivelse",
-        "area_sqm": "S, m²",
-        "north": "N",
-        "others": "... og andre",
-        "unit_m": "m",
-        "bow": "STÆVN",
-        "stern": "AGTER",
-    },
-    "fi": {
-        "project": "Projekti:",
-        "project_no": "Proj.nro:",
-        "org": "Org:",
-        "date": "Päiväys:",
-        "stage": "Vaihe:",
-        "scale": "Mittakaava:",
-        "draft": "Piirustus (P)",
-        "explication": "VYÖHYKESELITYS",
-        "total_area": "Kokonaispinta-ala:",
-        "sotki": "yksikköä",
-        "num": "Nro",
-        "name": "Kuvaus",
-        "area_sqm": "S, m²",
-        "north": "P",
-        "others": "... ja muut",
-        "unit_m": "m",
-        "bow": "KEULA",
-        "stern": "PERÄ",
-    },
-    "el": {
-        "project": "Έργο:",
-        "project_no": "Αρ. Έργου:",
-        "org": "Οργ.:",
-        "date": "Ημερομηνία:",
-        "stage": "Στάδιο:",
-        "scale": "Κλίμακα:",
-        "draft": "Σχέδιο (P)",
-        "explication": "ΥΠΟΜΝΗΜΑ ΖΩΝΩΝ",
-        "total_area": "Συνολικό Εμβαδόν:",
-        "sotki": "μονάδες",
-        "num": "Αρ.",
-        "name": "Περιγραφή",
-        "area_sqm": "S, m²",
-        "north": "Β",
-        "others": "... και άλλα",
-        "unit_m": "m",
-        "bow": "ΠΛΩΡΗ",
-        "stern": "ΠΡΥΜΝΗ",
-    },
-    "cs": {
-        "project": "Projekt:",
-        "project_no": "Č. projektu:",
-        "org": "Org.:",
-        "date": "Datum:",
-        "stage": "Fáze:",
-        "scale": "Měřítko:",
-        "draft": "Výkres (P)",
-        "explication": "LEGENDA ZÓN",
-        "total_area": "Celková plocha:",
-        "sotki": "jedn.",
-        "num": "Č.",
-        "name": "Popis",
-        "area_sqm": "S, m²",
-        "north": "S",
-        "others": "... a další",
-        "unit_m": "m",
-        "bow": "PŘÍĎ",
-        "stern": "ZÁĎ",
-    },
-    "hu": {
-        "project": "Projekt:",
-        "project_no": "Projekt sz.:",
-        "org": "Szervezet:",
-        "date": "Dátum:",
-        "stage": "Szakasz:",
-        "scale": "Lépték:",
-        "draft": "Rajz (P)",
-        "explication": "ZÓNA JELMAGYARÁZAT",
-        "total_area": "Összterület:",
-        "sotki": "egység",
-        "num": "Szám",
-        "name": "Megnevezés",
-        "area_sqm": "S, m²",
-        "north": "É",
-        "others": "... és mások",
-        "unit_m": "m",
-        "bow": "ORR",
-        "stern": "TAT",
-    },
-    "ro": {
-        "project": "Proiect:",
-        "project_no": "Nr. proiect:",
-        "org": "Org.:",
-        "date": "Data:",
-        "stage": "Etapă:",
-        "scale": "Scară:",
-        "draft": "Desen (P)",
-        "explication": "LEGENDĂ ZONE",
-        "total_area": "Suprafață totală:",
-        "sotki": "unități",
-        "num": "Nr.",
-        "name": "Descriere",
-        "area_sqm": "S, m²",
-        "north": "N",
-        "others": "... și altele",
-        "unit_m": "m",
-        "bow": "PROVĂ",
-        "stern": "PUPĂ",
-    },
-    "bg": {
-        "project": "Проект:",
-        "project_no": "№ Проект:",
-        "org": "Орг.:",
-        "date": "Дата:",
-        "stage": "Етап:",
-        "scale": "Мащаб:",
-        "draft": "Чертеж (П)",
-        "explication": "ЛЕГЕНДА ЗОНИ",
-        "total_area": "Обща площ:",
-        "sotki": "ед.",
-        "num": "№",
-        "name": "Наименование",
-        "area_sqm": "S, м²",
-        "north": "С",
-        "others": "... и други",
-        "unit_m": "м",
-        "bow": "НОС",
-        "stern": "КРУМА",
     },
 }
 
@@ -1750,7 +1597,11 @@ def _draw_stamp(
 
     # Row 2: Organization
     ax_stamp.text(
-        0.02, 0.7, texts["org"], fontproperties=_get_font(6.5, italic=True, lang=lang), va="center"
+        0.02,
+        0.7,
+        texts["org"],
+        fontproperties=_get_font(6.5, italic=True, lang=lang),
+        va="center",
     )
     ax_stamp.text(
         0.22,
@@ -1770,7 +1621,11 @@ def _draw_stamp(
     )
     wrapped_title = "\n".join(textwrap.wrap(plan.title, width=45))
     ax_stamp.text(
-        0.22, 0.5, wrapped_title, fontproperties=_get_font(7.5, bold=True, lang=lang), va="center"
+        0.22,
+        0.5,
+        wrapped_title,
+        fontproperties=_get_font(7.5, bold=True, lang=lang),
+        va="center",
     )
 
     # Row 4: Date, Stage, Scale
@@ -1781,7 +1636,9 @@ def _draw_stamp(
         fontproperties=_get_font(6.5, italic=True, lang=lang),
         va="center",
     )
-    ax_stamp.text(0.22, 0.3, plan.date, fontproperties=_get_font(6.5, lang=lang), va="center")
+    ax_stamp.text(
+        0.22, 0.3, plan.date, fontproperties=_get_font(6.5, lang=lang), va="center"
+    )
 
     # Scale box
     ax_stamp.axvline(0.5, ymin=0, ymax=0.4, color="black", lw=D)
@@ -1793,7 +1650,11 @@ def _draw_stamp(
         va="center",
     )
     ax_stamp.text(
-        0.75, 0.3, scale_str, fontproperties=_get_font(7.5, bold=True, lang=lang), va="center"
+        0.75,
+        0.3,
+        scale_str,
+        fontproperties=_get_font(7.5, bold=True, lang=lang),
+        va="center",
     )
 
     # Row 5: Drawing Name
@@ -1805,7 +1666,11 @@ def _draw_stamp(
         va="center",
     )
     ax_stamp.text(
-        0.22, 0.1, plan.title, fontproperties=_get_font(7.5, bold=True, lang=lang), va="center"
+        0.22,
+        0.1,
+        plan.title,
+        fontproperties=_get_font(7.5, bold=True, lang=lang),
+        va="center",
     )
 
 
@@ -2173,7 +2038,7 @@ def _draw_profile_table(fig, plan: ProfilePlan, pw_mm: float, ph_mm: float):
     table_w = pw_mm - MARGIN_LEFT - MARGIN_OTHER - STAMP_WIDTH - 10
     row_h = 8.0
     headers_w = 40.0
-    
+
     lang = plan.language if plan.language in I18N else "ru"
     txt = I18N[lang]
 
@@ -2676,6 +2541,9 @@ def _draw_furniture(ax, items: List[FurnitureItem]):
 
 
 def render_interior_plan(plan: InteriorPlan) -> bytes:
+    # Ensure hatch linewidth is set for thread safety (constant value)
+    matplotlib.rcParams["hatch.linewidth"] = D
+
     dpi = plan.dpi
     base_w, base_h = PAPER_SIZES.get(plan.paper_format.upper(), PAPER_SIZES["A4"])
     pw_mm, ph_mm = (
@@ -2786,6 +2654,9 @@ def render_interior_plan(plan: InteriorPlan) -> bytes:
 
 
 def render_plot_plan(plan: PlotPlan) -> bytes:
+    # Ensure hatch linewidth is set for thread safety (constant value)
+    matplotlib.rcParams["hatch.linewidth"] = D
+
     dpi = plan.dpi if plan.dpi >= 150 else 300
     lang = plan.language or "ru"
 
@@ -2818,14 +2689,29 @@ def render_plot_plan(plan: PlotPlan) -> bytes:
     _draw_sheet_reference_grid(ax_frame, pw_mm, ph_mm)
 
     # 4. Calculate Scale (ISO 5455)
-    all_points = list(plan.boundary_points)
-    for zone in plan.zones:
-        all_points.extend(zone.points)
+    # Collect all points for bounding box calculation (boundary, zones, as-built, volume grid)
+    xs: list[float] = []
+    ys: list[float] = []
 
-    if not all_points:
+    for p in plan.boundary_points:
+        xs.append(p.x)
+        ys.append(p.y)
+    for zone in plan.zones:
+        for zp in zone.points:
+            xs.append(zp.x)
+            ys.append(zp.y)
+    if plan.as_built_points:
+        for ab in plan.as_built_points:
+            xs.append(ab.actual_x)
+            ys.append(ab.actual_y)
+    if plan.volume_grid:
+        for cell in plan.volume_grid.cells:
+            xs.append(cell.center_x)
+            ys.append(cell.center_y)
+
+    if not xs:
         return b""
 
-    xs, ys = [p.x for p in all_points], [p.y for p in all_points]
     x_min, x_max, y_min, y_max = min(xs), max(xs), min(ys), max(ys)
     x_span, y_span = x_max - x_min or 1, y_max - y_min or 1
 
