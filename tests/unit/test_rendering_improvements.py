@@ -48,32 +48,34 @@ def test_format_coord_value_none():
     assert _format_coord_value(None) == "?"
 
 
-def test_font_scaling_small_scale():
-    """At small scales (large m_per_pt), font size increases."""
-    font_large = _get_font(size=7, m_per_pt=0.5)  # 5x reference
-    # Should be clamped to max 18pt
-    if isinstance(font_large, dict):
-        assert font_large["fontsize"] <= 18.0
-    else:
-        assert font_large.get_size() <= 18.0
-
-
-def test_font_scaling_large_scale():
-    """At large scales (small m_per_pt), font size decreases."""
-    font_small = _get_font(size=7, m_per_pt=0.02)  # 0.2x reference
-    if isinstance(font_small, dict):
-        assert font_small["fontsize"] >= 3.0
-    else:
-        assert font_small.get_size() >= 3.0
-
-
-def test_font_scaling_reference():
-    """At reference scale (0.1), font size is exact."""
+def test_font_size_constant():
+    """Font size should remain constant regardless of m_per_pt (ISO standard fixed on-paper size)."""
     font_ref = _get_font(size=7, m_per_pt=0.1)
+    font_large_scale = _get_font(size=7, m_per_pt=0.5)  # different m_per_pt
+    font_small_scale = _get_font(size=7, m_per_pt=0.02)
+
+    # All should have same size
     if isinstance(font_ref, dict):
         assert font_ref["fontsize"] == 7.0
+        assert font_large_scale["fontsize"] == 7.0
+        assert font_small_scale["fontsize"] == 7.0
     else:
         assert font_ref.get_size() == 7.0
+        assert font_large_scale.get_size() == 7.0
+        assert font_small_scale.get_size() == 7.0
+
+
+def test_font_size_clamped():
+    """Font size should be clamped to reasonable range."""
+    font_tiny = _get_font(size=1.0)
+    font_huge = _get_font(size=50.0)
+
+    if isinstance(font_tiny, dict):
+        assert font_tiny["fontsize"] == 3.0  # min
+        assert font_huge["fontsize"] == 24.0  # max
+    else:
+        assert font_tiny.get_size() == 3.0
+        assert font_huge.get_size() == 24.0
 
 
 def test_vertex_labels_collision_avoidance():

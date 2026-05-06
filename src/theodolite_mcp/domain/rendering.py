@@ -77,14 +77,13 @@ def _get_font(
     size: float = 7, bold: bool = False, italic: bool = False, m_per_pt: float = 0.1
 ):
     """
-    Returns font properties with size scaled appropriately for the drawing scale.
-    size: base font size in points at reference scale (1m ≈ 0.1pt)
-    m_per_pt: meters per point conversion factor
+    Returns font properties for drawing text.
+    Font sizes are in points (pt) and represent on-paper size per ISO 3098.
+    They should NOT scale with m_per_pt to maintain consistent readability.
+    The m_per_pt parameter is accepted for API compatibility but ignored.
     """
-    # Scale font with m_per_pt: at reference m_per_pt=0.1, size is as specified
-    # At different scales, adjust to maintain visual consistency
-    scale_factor = m_per_pt / 0.1
-    adjusted_size = max(3.0, min(18.0, size * scale_factor))
+    # Clamp to reasonable limits for readability
+    adjusted_size = max(3.0, min(24.0, size))
 
     if os.path.exists(FONT_PATH):
         weight = "bold" if bold else "normal"
