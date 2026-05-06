@@ -27,7 +27,8 @@ def test_gauss_kruger_basic_projection():
     # Equator, prime meridian, central meridian 0
     x, y = gauss_kruger_forward(lat=0.0, lon=0.0, lat0=0.0, lon0=0.0, ell=KRASOVSKY)
     assert x == pytest.approx(0.0, abs=1e-6)
-    assert y == pytest.approx(0.0, abs=1e-6)
+    # Standard false easting of 500,000 m applied
+    assert y == pytest.approx(500000.0, abs=1e-6)
 
 
 def test_gauss_kruger_moscow_zone7():
@@ -38,8 +39,9 @@ def test_gauss_kruger_moscow_zone7():
     )
     # Northing for 55°N should exceed 6,000,000m
     assert x > 6_000_000
-    # Easting offset from central meridian (1.3827°W) should be ~153,000m
-    assert abs(y) < 200_000
+    # With false easting 500,000, easting should be around 500k ± offset
+    # Offset from central meridian is about 86,000m (Moscow is west of CM)
+    assert abs(y - 500000) < 200_000
 
 
 def test_helmert_transform_wgs84_to_pulkovo1942():

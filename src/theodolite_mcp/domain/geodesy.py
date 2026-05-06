@@ -141,6 +141,7 @@ def gauss_kruger_forward(
     )
 
     # False Easting (Standard for many countries is zone_no * 1e6 + 500000)
+    y = y + 500000  # Add standard false easting
     return x, y
 
 
@@ -265,19 +266,27 @@ def utm_inverse(
     # Remove false easting
     x = easting - 500000
 
+    # False northing for southern hemisphere: letters C through M (excluding I,O)
+    if zone_letter in "CDEFGHJKLM":
+        y = northing - 10000000
+    else:
+        y = northing
+
     # Central meridian
     lon0 = (zone_num - 1) * 6 - 180 + 3
 
+    # Meridian arc from northing
+    M = y / k0
+
     a = ell.a
     e2 = ell.e2
-    e1 = (1 - math.sqrt(1 - e2)) / (1 + math.sqrt(1 - e2))
+    b = ell.b
 
-    n = (a - ell.b) / (a + ell.b)
+    n = (a - b) / (a + b)
     n2 = n**2
     n3 = n**3
     n4 = n**4
     n5 = n**5
-    n6 = n**6
 
     A = a * (1 - n + (5 / 4) * (n2 - n3) + (81 / 64) * (n4 - n5))
     B = (3 * a * n / 2) * (1 - n + (7 / 8) * (n2 - n3) + (55 / 64) * (n4 - n5))
@@ -285,47 +294,38 @@ def utm_inverse(
     D = (35 * a * n3 / 48) * (1 - n + (11 / 16) * (n2 - n3))
     E = (315 * a * n4 / 51) * (1 - n)
 
-    # Footpoint latitude
-    y = northing
-    mu = y / A
-
-    # Iterate to find phi
+    mu = M / A
     phi = mu
     for _ in range(10):
         phi_old = phi
         phi = (
             mu
             + (B / A) * math.sin(2 * phi)
-            - (C / A) * math.sin(4 * phi)
+            + (C / A) * math.sin(4 * phi)
             + (D / A) * math.sin(6 * phi)
-            - (E / A) * math.sin(8 * phi)
+            + (E / A) * math.sin(8 * phi)
         )
         if abs(phi - phi_old) < 1e-12:
             break
 
-    nu = a / math.sqrt(1 - e2 * math.sin(phi) ** 2)
-    rho = a * (1 - e2) / ((1 - e2 * math.sin(phi) ** 2) ** 1.5)
-    eta2 = nu / rho - 1
-    t = math.tan(phi) ** 2
+    sin_phi = math.sin(phi)
+    cos_phi = math.cos(phi)
+    tan_phi = math.tan(phi)
 
-    xi = (northing - k0 * phi * nu * math.cos(phi)) / (k0 * nu)
+    nu = a / math.sqrt(1 - e2 * sin_phi**2)
+    eta2 = (nu / (a * (1 - e2) / ((1 - e2 * sin_phi**2) ** 1.5))) - 1
+    t = tan_phi**2
 
-    lat = (
-        phi
-        - (t * xi**2 / 2) / rho
-        - (t * xi**4 / (24 * rho**3)) * (5 + 3 * t + eta2 - 4 * eta2**2 - 9 * t * eta2)
-    )
-    lat = math.degrees(lat)
+    # Compute λ from easting
+    alpha = x / (k0 * nu * cos_phi)
 
-    lon = lon0 + math.degrees(
-        (
-            xi
-            - (xi**3 / (6 * nu**2)) * (1 + 2 * t + eta2)
-            - (xi**5 / (120 * nu**4))
-            * (5 + 28 * t + 24 * t**2 + 6 * eta2 + 8 * t * eta2)
-        )
-        / math.cos(phi)
-    )
+    term1 = (1 - t + eta2) * alpha**3 / 6
+    term2 = (5 - 18 * t + t**2 + 72 * eta2 - 58 * ell.ep2) * alpha**5 / 120
+
+    lam = alpha - term1 - term2
+
+    lon = lon0 + math.degrees(lam)
+    lat = math.degrees(phi)
 
     return lat, lon
 
@@ -509,9 +509,9 @@ def gauss_kruger_inverse(
         phi = (
             mu
             + (B / A) * math.sin(2 * phi)
-            - (C / A) * math.sin(4 * phi)
+            + (C / A) * math.sin(4 * phi)
             + (D / A) * math.sin(6 * phi)
-            - (E / A) * math.sin(8 * phi)
+            + (E / A) * math.sin(8 * phi)
         )
         if abs(phi - phi_old) < 1e-12:
             break

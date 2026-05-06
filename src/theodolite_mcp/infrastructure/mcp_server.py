@@ -34,6 +34,22 @@ from ..domain.logic import (
     calculate_area,
     calculate_ppm_correction,
 )
+from ..domain.geodesy import (
+    WGS84,
+    KRASOVSKY,
+    helmert_transform,
+    geodetic_to_ecef,
+    ecef_to_geodetic,
+    gauss_kruger_forward,
+    gauss_kruger_inverse,
+    utm_forward,
+    utm_inverse,
+    mgrs_to_latlon,
+    calculate_grid_convergence,
+    calculate_point_scale_factor,
+    geoid_height_approx,
+    sk42_to_wgs84,
+)
 import math
 
 mcp = FastMCP("Survey Computation Engine")
@@ -756,6 +772,220 @@ def project_coordinates_gauss_kruger(
     Uses Krasovsky ellipsoid (standard for S-42/USK-2000).
     """
     return service.project_to_grid(lat, lon, 0.0, central_meridian)
+
+
+# ========== Military Geodesy Tools ==========
+
+
+@mcp.tool()
+def utm_projection_inverse(
+    northing: Annotated[float, Field(description="UTM northing in meters")],
+    easting: Annotated[float, Field(description="UTM easting in meters")],
+    zone_number: Annotated[int, Field(description="UTM zone number (1-60)")],
+    zone_letter: Annotated[
+        str, Field(description="UTM zone letter (C-X, excluding O and I)")
+    ],
+) -> dict:
+    """
+    UTM inverse projection (NATO Military Grid Standard).
+    Converts UTM coordinates to latitude/longitude.
+    """
+    lat, lon = utm_inverse(northing, easting, zone_number, zone_letter, WGS84)
+    return {"latitude": round(lat, 8), "longitude": round(lon, 8)}
+
+
+@mcp.tool()
+def gauss_kruger_projection_inverse(
+    northing: Annotated[
+        float, Field(description="GK northing (meters from false origin)")
+    ],
+    easting: Annotated[
+        float,
+        Field(
+            description="GK easting (meters from central meridian + 500,000 false easting)"
+        ),
+    ],
+    zone_central_meridian: Annotated[
+        float, Field(description="Central meridian of GK zone in decimal degrees")
+    ],
+    ellipsoid: Annotated[
+        str,
+        Field(
+            default="KRASOVSKY",
+            description="Ellipsoid: 'WGS84' or 'KRASOVSKY' (Soviet military standard)",
+        ),
+    ] = "KRASOVSKY",
+) -> dict:
+    """
+    Gauss-Krüger inverse projection (Soviet military grid).
+    Converts GK coordinates (Pulkovo 1942 / SK-42) to latitude/longitude.
+    """
+    ell = KRASOVSKY if ellipsoid == "KRASOVSKY" else WGS84
+    lat, lon = gauss_kruger_inverse(northing, easting, zone_central_meridian, ell)
+    return {"latitude": round(lat, 8), "longitude": round(lon, 8)}
+
+
+@mcp.tool()
+def utm_projection_forward(
+    lat: Annotated[float, Field(description="Latitude in decimal degrees")],
+    lon: Annotated[float, Field(description="Longitude in decimal degrees")],
+) -> dict:
+    """
+    UTM forward projection (NATO Military Grid Standard).
+    Returns northing, easting, zone number, and zone letter.
+    """
+    north, east, zone, letter = utm_forward(lat, lon, WGS84)
+    return {
+        "northing": round(north, 3),
+        "easting": round(east, 3),
+        "zone_number": zone,
+        "zone_letter": letter,
+    }
+
+
+@mcp.tool()
+def mgrs_to_latlon_conversion(
+    mgrs: Annotated[
+        str, Field(description="MGRS coordinate (e.g., '33U 12345 67890')")
+    ],
+) -> dict:
+    """
+    Convert MGRS (Military Grid Reference System) to latitude/longitude.
+    """
+    lat, lon = mgrs_to_latlon(mgrs, WGS84)
+    return {"latitude": round(lat, 8), "longitude": round(lon, 8)}
+
+
+@mcp.tool()
+def compute_grid_convergence(
+    lat: Annotated[float, Field(description="Latitude in decimal degrees")],
+    lon: Annotated[float, Field(description="Longitude in decimal degrees")],
+    central_meridian: Annotated[
+        float, Field(description="Central meridian of UTM zone (e.g., 39 for zone 37U)")
+    ],
+) -> float:
+    """
+    Calculate grid convergence (meridian convergence) in decimal degrees.
+    Grid Azimuth = True Azimuth - Grid Convergence.
+    Positive = grid north is east of true north.
+    """
+    return round(calculate_grid_convergence(lat, lon, central_meridian, KRASOVSKY), 6)
+
+
+@mcp.tool()
+def compute_point_scale_factor(
+    lat: Annotated[float, Field(description="Latitude in decimal degrees")],
+    lon: Annotated[float, Field(description="Longitude in decimal degrees")],
+    central_meridian: Annotated[
+        float, Field(description="Central meridian of UTM zone")
+    ],
+) -> float:
+    """
+    Calculate point scale factor (k) for UTM/Transverse Mercator projection.
+    At central meridian, k ≈ 0.9996 for UTM.
+    """
+    return round(calculate_point_scale_factor(lat, lon, central_meridian, WGS84), 8)
+
+
+@mcp.tool()
+def geoid_height_egm96(
+    lat: Annotated[float, Field(description="Latitude in decimal degrees")],
+    lon: Annotated[float, Field(description="Longitude in decimal degrees")],
+) -> float:
+    """
+    Approximate geoid height (N) using EGM96 model.
+    N = height of geoid above ellipsoid in meters.
+    """
+    return round(geoid_height_approx(lat, lon, model="EGM96"), 2)
+
+
+@mcp.tool()
+def geoid_height_egm2008(
+    lat: Annotated[float, Field(description="Latitude in decimal degrees")],
+    lon: Annotated[float, Field(description="Longitude in decimal degrees")],
+) -> float:
+    """
+    Approximate geoid height (N) using EGM2008 model.
+    N = height of geoid above ellipsoid in meters.
+    """
+    return round(geoid_height_approx(lat, lon, model="EGM2008"), 2)
+
+
+@mcp.tool()
+def helmert_transform_wgs84_to_local(
+    lat: Annotated[
+        float, Field(description="Latitude of WGS84 point (decimal degrees)")
+    ],
+    lon: Annotated[
+        float, Field(description="Longitude of WGS84 point (decimal degrees)")
+    ],
+    h: Annotated[float, Field(description="Ellipsoidal height in meters")],
+    dx: Annotated[float, Field(description="Helmert translation X (meters)")],
+    dy: Annotated[float, Field(description="Helmert translation Y (meters)")],
+    dz: Annotated[float, Field(description="Helmert translation Z (meters)")],
+    rx_sec: Annotated[float, Field(description="Helmert rotation X (arc-seconds)")],
+    ry_sec: Annotated[float, Field(description="Helmert rotation Y (arc-seconds)")],
+    rz_sec: Annotated[float, Field(description="Helmert rotation Z (arc-seconds)")],
+    s_ppm: Annotated[
+        float, Field(description="Helmert scale factor (PPM - parts per million)")
+    ],
+    target_ellipsoid: Annotated[
+        str,
+        Field(
+            default="KRASOVSKY",
+            description="Target ellipsoid: 'WGS84' or 'KRASOVSKY' (Soviet standard)",
+        ),
+    ] = "KRASOVSKY",
+) -> dict:
+    """
+    7-parameter Helmert transformation: WGS84 → local geodetic system.
+    For military coordinate system conversions (Pulkovo 1942, SK-42, etc.).
+    """
+    ell = KRASOVSKY if target_ellipsoid == "KRASOVSKY" else WGS84
+    params = {
+        "dx": dx,
+        "dy": dy,
+        "dz": dz,
+        "rx_sec": rx_sec,
+        "ry_sec": ry_sec,
+        "rz_sec": rz_sec,
+        "s_ppm": s_ppm,
+    }
+    result = service.transform_wgs84_to_local(lat, lon, h, params, target_ellipsoid=ell)
+    return {
+        "latitude": round(result["lat"], 8),
+        "longitude": round(result["lon"], 8),
+        "height": round(result["h"], 3),
+    }
+
+
+@mcp.tool()
+def convert_sk42_to_wgs84(
+    northing: Annotated[float, Field(description="SK-42 northing (meters)")],
+    easting: Annotated[float, Field(description="SK-42 easting (meters)")],
+    zone: Annotated[int, Field(description="Gauss-Kruger zone number (1-60)")],
+) -> dict:
+    """
+    Convert Soviet SK-42 (Pulkovo 1942) coordinates to WGS84.
+    SK-42 uses Krassovsky ellipsoid with GK zones.
+    """
+    lat, lon, h = sk42_to_wgs84(northing, easting, zone)
+    return {
+        "latitude": round(lat, 8),
+        "longitude": round(lon, 8),
+        "height": round(h, 3),
+    }
+
+
+@mcp.tool()
+def reverse_azimuth(
+    azimuth: Annotated[float, Field(description="Forward azimuth in decimal degrees")],
+) -> float:
+    """
+    Calculate the reverse (back) azimuth.
+    Back Azimuth = (Forward Azimuth ± 180°) normalized to [0, 360).
+    """
+    return round(normalize_angle(azimuth + 180.0), 4)
 
 
 if __name__ == "__main__":
