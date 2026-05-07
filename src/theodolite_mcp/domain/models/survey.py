@@ -58,6 +58,7 @@ class PlotPlan(BaseModel):
     show_north_arrow: bool = True
     show_scale_bar: bool = True
     coordinate_labels: bool = False
+    collision_avoidance: bool = True  # Smart label placement to avoid overlaps
     as_built_points: List[AsBuiltPoint] = []
     volume_grid: Optional[VolumeGrid] = None
     width_inches: float = 11.69  # Default A4 Landscape width
