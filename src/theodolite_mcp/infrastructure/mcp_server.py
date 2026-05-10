@@ -21,6 +21,13 @@ from theodolite_mcp.domain.models import (
     AsBuiltPoint,
     VolumeGrid,
     GridCell,
+    PipeSegment,
+    ValveSymbol,
+    EquipmentSymbol,
+    FittingSymbol,
+    InstrumentSymbol,
+    PipeSupport,
+    PipelineSchematic,
 )
 from ..domain.least_squares import ObservationLS
 from ..application.services import SurveyService
@@ -1462,3 +1469,305 @@ def draw_interior_plan_svg(
         return svg_bytes.decode("utf-8")
     except Exception as e:
         raise ValueError(f"draw_interior_plan_svg error: {e}") from e
+
+
+# ---------------------------------------------------------------------------
+# Pipeline Schematic Tools (ISO 6412 / ISO 14617 / ISO 3511)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def draw_pipeline_schematic(
+    title: Annotated[
+        str,
+        Field(default="Pipeline Schematic", description="Schematic drawing title"),
+    ] = "Pipeline Schematic",
+    project_number: Annotated[
+        str, Field(default="P-001", description="Project number")
+    ] = "P-001",
+    organization: Annotated[
+        str, Field(default="Engineering Bureau", description="Organization name")
+    ] = "Engineering Bureau",
+    pipes_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of pipe segments with start_pt, end_pt, medium, nominal_diameter, insulated, flow_direction",
+        ),
+    ] = None,
+    valves_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of valve symbols: center_pt, valve_type (gate/ball/globe/check/butterfly/3way_mixing/prv/safety), rotation, nominal_diameter, tag",
+        ),
+    ] = None,
+    equipment_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of equipment symbols: center_pt, equipment_type (centrifugal_pump/circulation_pump/boiler/shell_tube_hx/plate_hx/expansion_vessel/storage_tank/y_strainer/mesh_filter/pressure_gauge/thermometer/flow_meter/heat_meter), width, height, tag, label",
+        ),
+    ] = None,
+    fittings_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of fitting symbols: center_pt, fitting_type (elbow_90/elbow_45/tee/reducer/union/flange/cross), rotation, nominal_diameter",
+        ),
+    ] = None,
+    instruments_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of ISO 3511 instrument bubbles: center_pt, measured_variable (T/P/F/L), suffix (I/R/C/T/A), tag_number, in_dcs",
+        ),
+    ] = None,
+    supports_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of pipe supports: center_pt, support_type (anchor/guide/hanger/spring)",
+        ),
+    ] = None,
+    language: Annotated[
+        str,
+        Field(default="ru", description="Drawing language: 'ru', 'en', 'uk'"),
+    ] = "ru",
+    paper_format: Annotated[
+        str, Field(default="A3", description="Paper size: A0, A1, A2, A3, A4")
+    ] = "A3",
+    scale: Annotated[
+        int,
+        Field(default=50, description="Drawing scale denominator (e.g., 50 for 1:50)"),
+    ] = 50,
+    show_legend: Annotated[
+        bool, Field(default=True, description="Show symbol legend on the drawing")
+    ] = True,
+    show_tags: Annotated[
+        bool, Field(default=True, description="Show equipment/valve tag labels")
+    ] = True,
+    output_path: Annotated[
+        Optional[str],
+        Field(default=None, description="Optional file path to save PNG output"),
+    ] = None,
+) -> Image:
+    """
+    Generates an ISO 6412/14617/3511 pipeline schematic for boiler/heating installations.
+    Supports pipe segments with flow arrows, insulation, valve symbols, equipment symbols,
+    fitting symbols, P&ID instrument bubbles, and pipe supports.
+    All coordinates and dimensions MUST be in METERS.
+    """
+    try:
+        pipes = [PipeSegment(**p) for p in (pipes_json or [])]
+        valves = [ValveSymbol(**v) for v in (valves_json or [])]
+        equipment = [EquipmentSymbol(**e) for e in (equipment_json or [])]
+        fittings = [FittingSymbol(**f) for f in (fittings_json or [])]
+        instruments = [InstrumentSymbol(**i) for i in (instruments_json or [])]
+        supports = [PipeSupport(**s) for s in (supports_json or [])]
+
+        plan = PipelineSchematic(
+            title=title,
+            project_number=project_number,
+            organization=organization,
+            pipes=pipes,
+            valves=valves,
+            equipment=equipment,
+            fittings=fittings,
+            instruments=instruments,
+            supports=supports,
+            language=language,
+            paper_format=paper_format,
+            scale=scale,
+            show_legend=show_legend,
+            show_tags=show_tags,
+        )
+        png_bytes = service.render_schematic(plan, output_path=output_path)
+        return Image(data=png_bytes, format="png")
+    except Exception as e:
+        raise ValueError(f"draw_pipeline_schematic error: {e}") from e
+
+
+@mcp.tool()
+def draw_pipeline_schematic_svg(
+    title: Annotated[
+        str,
+        Field(default="Pipeline Schematic", description="Schematic drawing title"),
+    ] = "Pipeline Schematic",
+    project_number: Annotated[
+        str, Field(default="P-001", description="Project number")
+    ] = "P-001",
+    organization: Annotated[
+        str, Field(default="Engineering Bureau", description="Organization name")
+    ] = "Engineering Bureau",
+    pipes_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of pipe segments with start_pt, end_pt, medium, nominal_diameter, insulated, flow_direction",
+        ),
+    ] = None,
+    valves_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of valve symbols: center_pt, valve_type, rotation, nominal_diameter, tag",
+        ),
+    ] = None,
+    equipment_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of equipment symbols: center_pt, equipment_type, width, height, tag, label",
+        ),
+    ] = None,
+    fittings_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of fitting symbols: center_pt, fitting_type, rotation, nominal_diameter",
+        ),
+    ] = None,
+    instruments_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of ISO 3511 instrument bubbles: center_pt, measured_variable, suffix, tag_number, in_dcs",
+        ),
+    ] = None,
+    supports_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of pipe supports: center_pt, support_type",
+        ),
+    ] = None,
+    language: Annotated[
+        str,
+        Field(default="ru", description="Drawing language: 'ru', 'en', 'uk'"),
+    ] = "ru",
+    paper_format: Annotated[
+        str, Field(default="A3", description="Paper size: A0, A1, A2, A3, A4")
+    ] = "A3",
+    scale: Annotated[
+        int,
+        Field(default=50, description="Drawing scale denominator"),
+    ] = 50,
+    show_legend: Annotated[
+        bool, Field(default=True, description="Show symbol legend")
+    ] = True,
+    show_tags: Annotated[
+        bool, Field(default=True, description="Show tag labels")
+    ] = True,
+    output_path: Annotated[
+        Optional[str],
+        Field(default=None, description="Optional file path to save SVG output"),
+    ] = None,
+) -> str:
+    """Generates a pipeline schematic in SVG format (ISO 6412/14617/3511)."""
+    try:
+        pipes = [PipeSegment(**p) for p in (pipes_json or [])]
+        valves = [ValveSymbol(**v) for v in (valves_json or [])]
+        equipment = [EquipmentSymbol(**e) for e in (equipment_json or [])]
+        fittings = [FittingSymbol(**f) for f in (fittings_json or [])]
+        instruments = [InstrumentSymbol(**i) for i in (instruments_json or [])]
+        supports = [PipeSupport(**s) for s in (supports_json or [])]
+
+        plan = PipelineSchematic(
+            title=title,
+            project_number=project_number,
+            organization=organization,
+            pipes=pipes,
+            valves=valves,
+            equipment=equipment,
+            fittings=fittings,
+            instruments=instruments,
+            supports=supports,
+            language=language,
+            paper_format=paper_format,
+            scale=scale,
+            show_legend=show_legend,
+            show_tags=show_tags,
+        )
+        svg_bytes = service.render_schematic(
+            plan, output_path=output_path, output_format="svg"
+        )
+        return svg_bytes.decode("utf-8")
+    except Exception as e:
+        raise ValueError(f"draw_pipeline_schematic_svg error: {e}") from e
+
+
+@mcp.tool()
+def mcp_export_schematic_to_dxf(
+    title: Annotated[
+        str,
+        Field(default="Pipeline Schematic", description="Schematic title stored in DXF"),
+    ] = "Pipeline Schematic",
+    project_number: Annotated[
+        str, Field(default="P-001", description="Project number")
+    ] = "P-001",
+    organization: Annotated[
+        str, Field(default="Engineering Bureau", description="Organization")
+    ] = "Engineering Bureau",
+    pipes_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of pipe segments",
+        ),
+    ] = None,
+    valves_json: Annotated[
+        Optional[list[dict]],
+        Field(default=None, description="List of valve symbols"),
+    ] = None,
+    equipment_json: Annotated[
+        Optional[list[dict]],
+        Field(default=None, description="List of equipment symbols"),
+    ] = None,
+    fittings_json: Annotated[
+        Optional[list[dict]],
+        Field(default=None, description="List of fitting symbols"),
+    ] = None,
+    instruments_json: Annotated[
+        Optional[list[dict]],
+        Field(default=None, description="List of ISO 3511 instrument bubbles"),
+    ] = None,
+    supports_json: Annotated[
+        Optional[list[dict]],
+        Field(default=None, description="List of pipe supports"),
+    ] = None,
+    filename: Annotated[
+        str,
+        Field(
+            default="exported_schematic.dxf",
+            description="Output DXF filename (saved in 'output/' directory)",
+        ),
+    ] = "exported_schematic.dxf",
+) -> str:
+    """Exports a pipeline schematic to DXF for AutoCAD/Civil 3D. Layers per pipe medium and symbol type."""
+    try:
+        pipes = [PipeSegment(**p) for p in (pipes_json or [])]
+        valves = [ValveSymbol(**v) for v in (valves_json or [])]
+        equipment = [EquipmentSymbol(**e) for e in (equipment_json or [])]
+        fittings = [FittingSymbol(**f) for f in (fittings_json or [])]
+        instruments = [InstrumentSymbol(**i) for i in (instruments_json or [])]
+        supports = [PipeSupport(**s) for s in (supports_json or [])]
+
+        plan = PipelineSchematic(
+            title=title,
+            project_number=project_number,
+            organization=organization,
+            pipes=pipes,
+            valves=valves,
+            equipment=equipment,
+            fittings=fittings,
+            instruments=instruments,
+            supports=supports,
+        )
+
+        output_dir = os.path.join(os.getcwd(), "output")
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, filename)
+        return service.export_schematic_dxf(plan, output_path)
+    except Exception as e:
+        raise ValueError(f"mcp_export_schematic_to_dxf error: {e}") from e

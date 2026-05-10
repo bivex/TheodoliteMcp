@@ -7,6 +7,7 @@ from theodolite_mcp.domain.models import (
     PlotPlan,
     ProfilePlan,
     InteriorPlan,
+    PipelineSchematic,
 )
 from ..domain.logic import calculate_traverse
 from ..domain.rendering import (
@@ -14,7 +15,7 @@ from ..domain.rendering import (
     render_profile_plan,
     render_interior_plan,
 )
-from ..domain.dxf_export import export_plan_to_dxf, export_profile_to_dxf
+from ..domain.dxf_export import export_plan_to_dxf, export_profile_to_dxf, export_schematic_to_dxf
 from ..domain.dxf_validation import validate_dxf_file, ValidationReport
 from ..domain.least_squares import ObservationLS, adjust_network_2d, LSAResult
 from ..domain.geodesy import (
@@ -25,22 +26,7 @@ from ..domain.geodesy import (
     ecef_to_geodetic,
     gauss_kruger_forward,
 )
-from ..domain.rendering import (
-    render_plot_plan,
-    render_profile_plan,
-    render_interior_plan,
-)
-from ..domain.dxf_export import export_plan_to_dxf, export_profile_to_dxf
-from ..domain.dxf_validation import validate_dxf_file, ValidationReport
-from ..domain.least_squares import ObservationLS, adjust_network_2d, LSAResult
-from ..domain.geodesy import (
-    WGS84,
-    KRASOVSKY,
-    helmert_transform,
-    geodetic_to_ecef,
-    ecef_to_geodetic,
-    gauss_kruger_forward,
-)
+from ..domain.schematic_rendering import render_pipeline_schematic
 
 
 class SurveyService:
@@ -83,11 +69,24 @@ class SurveyService:
             render_interior_plan(plan, output_format), output_path
         )
 
+    def render_schematic(
+        self,
+        plan: PipelineSchematic,
+        output_path: Optional[str] = None,
+        output_format: str = "png",
+    ) -> bytes:
+        return self._save_if_needed(
+            render_pipeline_schematic(plan, output_format), output_path
+        )
+
     def export_dxf(self, plan: PlotPlan, output_path: str) -> str:
         return export_plan_to_dxf(plan, output_path)
 
     def export_profile_dxf(self, plan: ProfilePlan, output_path: str) -> str:
         return export_profile_to_dxf(plan, output_path)
+
+    def export_schematic_dxf(self, plan: PipelineSchematic, output_path: str) -> str:
+        return export_schematic_to_dxf(plan, output_path)
 
     def validate_dxf(
         self, dxf_path: str, check_geometry: bool = True

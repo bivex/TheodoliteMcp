@@ -1,5 +1,8 @@
 import ezdxf
 from theodolite_mcp.domain.models import PlotPlan, Point, Zone, ProfilePlan
+from theodolite_mcp.domain.models.schematic import (
+    PipelineSchematic, PipeMedium,
+)
 import os
 
 
@@ -167,6 +170,212 @@ def export_profile_to_dxf(plan: ProfilePlan, output_path: str):
         (points[-1].station, table_bottom),
         dxfattribs={"layer": "V-PROF-TABLE"},
     )
+
+    doc.saveas(output_path)
+    return output_path
+
+
+# ---------------------------------------------------------------------------
+# Media → DXF layer color mapping
+# ---------------------------------------------------------------------------
+_MEDIA_LAYER_COLORS = {
+    PipeMedium.HEATING_SUPPLY: 1,    # Red
+    PipeMedium.HEATING_RETURN: 5,    # Blue
+    PipeMedium.COLD_WATER: 3,        # Green
+    PipeMedium.HOT_WATER: 1,         # Red
+    PipeMedium.GAS: 40,              # Yellow
+    PipeMedium.STEAM: 8,             # Gray
+    PipeMedium.CONDENSATE: 4,        # Cyan
+    PipeMedium.DRAINAGE: 30,         # Brown
+    PipeMedium.CUSTOM: 7,            # White
+}
+
+
+def _ensure_pipe_layers(doc, media_types_used):
+    """Create DXF layers for each pipe medium used."""
+    for medium in media_types_used:
+        layer_name = f"PIPE_{medium.upper()}"
+        color = _MEDIA_LAYER_COLORS.get(medium, 7)
+        if not doc.layers.has_entry(layer_name):
+            doc.layers.add(name=layer_name, color=color)
+    for layer_name, color in [
+        ("SYMBOLS_VALVES", 7),
+        ("SYMBOLS_EQUIPMENT", 7),
+        ("SYMBOLS_FITTINGS", 7),
+        ("SYMBOLS_INSTRUMENTS", 7),
+        ("SYMBOLS_SUPPORTS", 8),
+        ("INSULATION", 8),
+        ("TEXT_TAGS", 7),
+        ("TEXT_LABELS", 7),
+    ]:
+        if not doc.layers.has_entry(layer_name):
+            doc.layers.add(name=layer_name, color=color)
+
+
+def _dxf_valve(msp, valve, text_height):
+    cx, cy = valve.center_pt.x, valve.center_pt.y
+    s = max(0.15, valve.nominal_diameter / 1000.0 * 0.8)
+    layer = "SYMBOLS_VALVES"
+    vt = valve.valve_type
+
+    if vt == "gate":
+        msp.add_line((cx - s, cy - s * 0.7), (cx, cy), dxfattribs={"layer": layer})
+        msp.add_line((cx, cy), (cx - s, cy + s * 0.7), dxfattribs={"layer": layer})
+        msp.add_line((cx + s, cy - s * 0.7), (cx, cy), dxfattribs={"layer": layer})
+        msp.add_line((cx, cy), (cx + s, cy + s * 0.7), dxfattribs={"layer": layer})
+    elif vt == "ball":
+        msp.add_circle((cx, cy), s * 0.6, dxfattribs={"layer": layer})
+        msp.add_line((cx - s, cy), (cx + s, cy), dxfattribs={"layer": layer})
+    elif vt == "check":
+        msp.add_line((cx - s * 0.5, cy - s * 0.7), (cx + s, cy), dxfattribs={"layer": layer})
+        msp.add_line((cx - s * 0.5, cy + s * 0.7), (cx + s, cy), dxfattribs={"layer": layer})
+        msp.add_line((cx - s * 0.5, cy - s * 0.7), (cx - s * 0.5, cy + s * 0.7), dxfattribs={"layer": layer})
+    else:
+        msp.add_circle((cx, cy), s * 0.5, dxfattribs={"layer": layer})
+
+    if valve.tag:
+        msp.add_text(valve.tag, dxfattribs={
+            "layer": "TEXT_TAGS", "height": text_height,
+        }).set_placement((cx, cy + s * 1.2))
+
+
+def _dxf_equipment(msp, eq, text_height):
+    cx, cy = eq.center_pt.x, eq.center_pt.y
+    hw, hh = eq.width / 2, eq.height / 2
+    layer = "SYMBOLS_EQUIPMENT"
+    et = eq.equipment_type
+
+    if et in ("centrifugal_pump", "circulation_pump"):
+        r = min(hw, hh)
+        msp.add_circle((cx, cy), r, dxfattribs={"layer": layer})
+        msp.add_line((cx, cy - r * 0.8), (cx - r * 0.5, cy + r * 0.4), dxfattribs={"layer": layer})
+        msp.add_line((cx - r * 0.5, cy + r * 0.4), (cx + r * 0.5, cy + r * 0.4), dxfattribs={"layer": layer})
+        msp.add_line((cx + r * 0.5, cy + r * 0.4), (cx, cy - r * 0.8), dxfattribs={"layer": layer})
+    elif et == "boiler":
+        msp.add_lwpolyline(
+            [(cx - hw, cy - hh), (cx + hw, cy - hh), (cx + hw, cy + hh), (cx - hw, cy + hh)],
+            close=True, dxfattribs={"layer": layer},
+        )
+    else:
+        msp.add_lwpolyline(
+            [(cx - hw, cy - hh), (cx + hw, cy - hh), (cx + hw, cy + hh), (cx - hw, cy + hh)],
+            close=True, dxfattribs={"layer": layer},
+        )
+
+    if eq.tag:
+        msp.add_text(eq.tag, dxfattribs={
+            "layer": "TEXT_TAGS", "height": text_height,
+        }).set_placement((cx, cy + hh + text_height * 0.5))
+    if eq.label:
+        msp.add_text(eq.label, dxfattribs={
+            "layer": "TEXT_LABELS", "height": text_height * 0.8,
+        }).set_placement((cx, cy - hh - text_height))
+
+
+def _dxf_instrument(msp, instr, text_height):
+    cx, cy = instr.center_pt.x, instr.center_pt.y
+    r = 0.12
+    layer = "SYMBOLS_INSTRUMENTS"
+
+    if instr.in_dcs:
+        msp.add_lwpolyline(
+            [(cx - r, cy - r), (cx + r, cy - r), (cx + r, cy + r), (cx - r, cy + r)],
+            close=True, dxfattribs={"layer": layer},
+        )
+
+    msp.add_circle((cx, cy), r, dxfattribs={"layer": layer})
+
+    tag = f"{instr.measured_variable}{instr.suffix}-{instr.tag_number}"
+    msp.add_text(tag, dxfattribs={
+        "layer": "TEXT_TAGS", "height": text_height * 0.7, "horiz_align": 4,
+    }).set_placement((cx, cy))
+
+
+def export_schematic_to_dxf(plan: PipelineSchematic, output_path: str):
+    """Export a PipelineSchematic to DXF with per-medium layers."""
+    doc = ezdxf.new("R2010")
+    msp = doc.modelspace()
+
+    media_used = set(p.medium for p in plan.pipes)
+    _ensure_pipe_layers(doc, media_used)
+
+    # Text height
+    all_pts = []
+    for p in plan.pipes:
+        all_pts.extend([(p.start_pt.x, p.start_pt.y), (p.end_pt.x, p.end_pt.y)])
+    for e in plan.equipment:
+        all_pts.append((e.center_pt.x, e.center_pt.y))
+    if all_pts:
+        xs = [p[0] for p in all_pts]
+        ys = [p[1] for p in all_pts]
+        span = max(max(xs) - min(xs), max(ys) - min(ys), 1.0)
+        text_height = span * 0.015
+    else:
+        text_height = 0.5
+
+    # Pipes
+    for pipe in plan.pipes:
+        layer = f"PIPE_{pipe.medium.upper()}"
+        msp.add_line(
+            (pipe.start_pt.x, pipe.start_pt.y),
+            (pipe.end_pt.x, pipe.end_pt.y),
+            dxfattribs={"layer": layer},
+        )
+        mx = (pipe.start_pt.x + pipe.end_pt.x) / 2
+        my = (pipe.start_pt.y + pipe.end_pt.y) / 2
+        msp.add_text(f"DN{pipe.nominal_diameter}", dxfattribs={
+            "layer": "TEXT_LABELS", "height": text_height * 0.7,
+        }).set_placement((mx, my + text_height))
+
+        if pipe.insulated:
+            dx = pipe.end_pt.x - pipe.start_pt.x
+            dy = pipe.end_pt.y - pipe.start_pt.y
+            seg_len = (dx ** 2 + dy ** 2) ** 0.5
+            if seg_len > 0:
+                offset = 0.15 * (pipe.nominal_diameter / 1000.0)
+                nx, ny = -dy / seg_len * offset, dx / seg_len * offset
+                for sign in (1, -1):
+                    msp.add_line(
+                        (pipe.start_pt.x + sign * nx, pipe.start_pt.y + sign * ny),
+                        (pipe.end_pt.x + sign * nx, pipe.end_pt.y + sign * ny),
+                        dxfattribs={"layer": "INSULATION"},
+                    )
+
+    # Fittings
+    for fitting in plan.fittings:
+        cx, cy = fitting.center_pt.x, fitting.center_pt.y
+        s = max(0.1, fitting.nominal_diameter / 1000.0 * 0.6)
+        layer = "SYMBOLS_FITTINGS"
+        ft = fitting.fitting_type
+        if ft in ("tee", "cross"):
+            msp.add_line((cx - s, cy), (cx + s, cy), dxfattribs={"layer": layer})
+            msp.add_line((cx, cy - s), (cx, cy + s), dxfattribs={"layer": layer})
+        elif ft == "elbow_90":
+            msp.add_line((cx + s, cy), (cx, cy), dxfattribs={"layer": layer})
+            msp.add_line((cx, cy), (cx, cy + s), dxfattribs={"layer": layer})
+        elif ft == "reducer":
+            msp.add_line((cx - s, cy - s * 0.3), (cx + s, cy - s * 0.6), dxfattribs={"layer": layer})
+            msp.add_line((cx - s, cy + s * 0.3), (cx + s, cy + s * 0.6), dxfattribs={"layer": layer})
+        else:
+            msp.add_line((cx - s, cy), (cx + s, cy), dxfattribs={"layer": layer})
+
+    for valve in plan.valves:
+        _dxf_valve(msp, valve, text_height)
+
+    for eq in plan.equipment:
+        _dxf_equipment(msp, eq, text_height)
+
+    for instr in plan.instruments:
+        _dxf_instrument(msp, instr, text_height)
+
+    for support in plan.supports:
+        cx, cy = support.center_pt.x, support.center_pt.y
+        s = 0.06
+        layer = "SYMBOLS_SUPPORTS"
+        msp.add_lwpolyline(
+            [(cx - s, cy - s), (cx + s, cy - s), (cx, cy + s)],
+            close=True, dxfattribs={"layer": layer},
+        )
 
     doc.saveas(output_path)
     return output_path

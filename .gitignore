@@ -58,3 +58,4 @@ output/
 test_*.png
 *.png
 !docs/gallery/*.png
+/.playwright-mcp
