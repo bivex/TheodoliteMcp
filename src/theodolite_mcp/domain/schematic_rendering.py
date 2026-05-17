@@ -17,6 +17,7 @@ from theodolite_mcp.domain.models.schematic import (
     PipeSegment, ValveSymbol, EquipmentSymbol, FittingSymbol,
     InstrumentSymbol, PipeSupport, PipelineSchematic,
     PipeMedium, ValveType, EquipmentType, FittingType, PipeSupportType,
+    Point as ModelPoint,
 )
 from theodolite_mcp.domain.rendering import (
     D, D_WIDE, D_EXTRA_WIDE, D_SYMBOL, MM_TO_PT,
@@ -64,10 +65,18 @@ def _rot_points(pts, cx, cy, angle_deg):
     return [_rot(x, y, cx, cy, angle_deg) for x, y in pts]
 
 
+import matplotlib.patheffects as path_effects
+
 # ---------------------------------------------------------------------------
-# Pipe segments
+# Drawing helpers
 # ---------------------------------------------------------------------------
-def _draw_pipe_segment(ax, pipe: PipeSegment, m_per_pt: float):
+def _add_text_halo(text_obj):
+    """Add a white outline to text to make it readable over lines."""
+    text_obj.set_path_effects([
+        path_effects.withStroke(linewidth=3, foreground="white", alpha=0.8)
+    ])
+
+def _draw_pipe_segment(ax, pipe: PipeSegment, m_per_pt: float, tracker: Optional[LabelTracker] = None):
     style = MEDIA_STYLES.get(pipe.medium, MEDIA_STYLES[PipeMedium.CUSTOM])
     color = pipe.custom_color or style["color"]
     lw = _dn_lw(pipe.nominal_diameter)
@@ -78,7 +87,7 @@ def _draw_pipe_segment(ax, pipe: PipeSegment, m_per_pt: float):
     ax.plot([x1, x2], [y1, y2], color=color, linestyle=style["ls"],
             linewidth=lw, solid_capstyle="round", zorder=2)
 
-    # Insulation: parallel dashed lines
+    # ... (insulation and arrow logic)
     if pipe.insulated:
         dx, dy = x2 - x1, y2 - y1
         seg_len = math.hypot(dx, dy)
@@ -91,7 +100,6 @@ def _draw_pipe_segment(ax, pipe: PipeSegment, m_per_pt: float):
                         color=color, linestyle=TYPE_02, linewidth=D * 0.5,
                         alpha=0.6, zorder=1)
 
-    # Flow direction arrow
     if pipe.flow_direction != "none" and (x1 != x2 or y1 != y2):
         dx, dy = x2 - x1, y2 - y1
         seg_len = math.hypot(dx, dy)
@@ -114,10 +122,20 @@ def _draw_pipe_segment(ax, pipe: PipeSegment, m_per_pt: float):
         mx, my = (x1 + x2) / 2, (y1 + y2) / 2
         dx, dy = x2 - x1, y2 - y1
         nx, ny = -dy / seg_len, dx / seg_len
-        offset = 0.08
-        ax.text(mx + nx * offset, my + ny * offset, f"DN{pipe.nominal_diameter}",
+        offset = 0.12
+        txt = f"DN{pipe.nominal_diameter}"
+        
+        # Check for collision if tracker provided
+        if tracker:
+            bbox = tracker.text_bounds(mx + nx * offset, my + ny * offset, txt, 8, m_per_pt)
+            if tracker.collides(bbox):
+                offset = -0.15 # Flip side if collides
+        
+        t = ax.text(mx + nx * offset, my + ny * offset, txt,
                 fontproperties=_get_font(8, m_per_pt=m_per_pt),
                 ha="center", va="center", color=color, zorder=5)
+        _add_text_halo(t)
+        if tracker: tracker.boxes.append(bbox)
 
 
 # ---------------------------------------------------------------------------
@@ -226,16 +244,17 @@ def _draw_valve_symbol(ax, valve: ValveSymbol, m_per_pt: float):
     # Tag label
     if valve.tag:
         tag_pos = _rot(cx, cy + s * 1.5, cx, cy, ang)
-        ax.text(tag_pos[0], tag_pos[1], valve.tag,
+        t = ax.text(tag_pos[0], tag_pos[1], valve.tag,
                 fontproperties=_get_font(10, bold=True, m_per_pt=m_per_pt),
                 ha="center", va="bottom", color="black", zorder=8,
                 bbox=dict(boxstyle="round,pad=0.05", fc="white", ec="none", alpha=0.8))
+        _add_text_halo(t)
 
 
 # ---------------------------------------------------------------------------
 # Equipment symbols (ISO 14617)
 # ---------------------------------------------------------------------------
-def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float):
+def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float, tracker: Optional[LabelTracker] = None):
     cx, cy = eq.center_pt.x, eq.center_pt.y
     w, h = eq.width, eq.height
     ang = eq.rotation
@@ -399,18 +418,35 @@ def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float):
                 ha="center", va="center", color="black", zorder=8)
 
     # Tag + label
-    tag_offset = max(w, h) / 2 + 0.1
+    tag_offset = max(w, h) / 2 + 0.15
     if eq.tag:
         tag_pos = _rot(cx, cy + tag_offset, cx, cy, ang)
-        ax.text(tag_pos[0], tag_pos[1], eq.tag,
+        txt = eq.tag
+        if tracker:
+            bbox = tracker.text_bounds(tag_pos[0], tag_pos[1], txt, 10, m_per_pt)
+            if tracker.collides(bbox):
+                tag_pos = _rot(cx, cy + tag_offset + 0.2, cx, cy, ang) 
+        
+        t = ax.text(tag_pos[0], tag_pos[1], txt,
                 fontproperties=_get_font(10, bold=True, m_per_pt=m_per_pt),
                 ha="center", va="bottom", color="black", zorder=8,
                 bbox=dict(boxstyle="round,pad=0.05", fc="white", ec="none", alpha=0.8))
+        _add_text_halo(t)
+        if tracker: tracker.boxes.append(tracker.text_bounds(tag_pos[0], tag_pos[1], txt, 10, m_per_pt))
+
     if eq.label:
         lbl_pos = _rot(cx, cy - tag_offset, cx, cy, ang)
-        ax.text(lbl_pos[0], lbl_pos[1], eq.label,
+        txt = eq.label
+        if tracker:
+            bbox = tracker.text_bounds(lbl_pos[0], lbl_pos[1], txt, 8, m_per_pt)
+            if tracker.collides(bbox):
+                lbl_pos = _rot(cx, cy - tag_offset - 0.25, cx, cy, ang)
+        
+        t = ax.text(lbl_pos[0], lbl_pos[1], txt,
                 fontproperties=_get_font(8, m_per_pt=m_per_pt),
                 ha="center", va="top", color="#333333", zorder=8)
+        _add_text_halo(t)
+        if tracker: tracker.boxes.append(tracker.text_bounds(lbl_pos[0], lbl_pos[1], txt, 8, m_per_pt))
 
 
 # ---------------------------------------------------------------------------
@@ -503,9 +539,10 @@ def _draw_instrument_bubble(ax, instr: InstrumentSymbol, m_per_pt: float):
     ax.plot([cx, cx], [cy - r * 1.5, cy - r], color="black", lw=D, zorder=5)
 
     # Tag text inside bubble
-    ax.text(cx, cy, tag,
+    t = ax.text(cx, cy, tag,
             fontproperties=_get_font(8, bold=True, m_per_pt=m_per_pt),
             ha="center", va="center", color="black", zorder=8)
+    _add_text_halo(t)
 
 
 # ---------------------------------------------------------------------------
@@ -617,14 +654,10 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
             ax_leg.plot([sample_x - 7, sample_x + 7], [ry, ry],
                         color=style["color"], linestyle=style["ls"], linewidth=D_WIDE * 3, zorder=10)
         elif itype == "valve":
-            from .models.schematic import Point as ModelPoint
-            # Scale up the nominal diameter or the result of drawing to be visible
             v = ValveSymbol(center_pt=ModelPoint(x=sample_x/legend_symbol_scale, y=ry/legend_symbol_scale), 
-                            valve_type=key, nominal_diameter=200) # Use large DN for better visibility
-            # Temporarily scale the axis to draw the symbol correctly
+                            valve_type=key, nominal_diameter=200) 
             _draw_valve_symbol(ax_leg, v, leg_m_per_pt)
         elif itype == "equipment":
-            # For equipment, width/height are already in 'meters' (which we map to units)
             v = EquipmentSymbol(center_pt=ModelPoint(x=sample_x, y=ry), equipment_type=key, width=10, height=10)
             _draw_equipment_symbol(ax_leg, v, leg_m_per_pt)
         elif itype == "instrument":
@@ -730,8 +763,9 @@ def render_pipeline_schematic(plan: PipelineSchematic, output_format: str = "png
     ax.axis("off")
 
     # Draw all elements
+    tracker = LabelTracker()
     for pipe in plan.pipes:
-        _draw_pipe_segment(ax, pipe, m_per_pt)
+        _draw_pipe_segment(ax, pipe, m_per_pt, tracker=tracker)
 
     for fitting in plan.fittings:
         _draw_fitting_symbol(ax, fitting, m_per_pt)
@@ -740,7 +774,7 @@ def render_pipeline_schematic(plan: PipelineSchematic, output_format: str = "png
         _draw_valve_symbol(ax, valve, m_per_pt)
 
     for eq in plan.equipment:
-        _draw_equipment_symbol(ax, eq, m_per_pt)
+        _draw_equipment_symbol(ax, eq, m_per_pt, tracker=tracker)
 
     for instr in plan.instruments:
         _draw_instrument_bubble(ax, instr, m_per_pt)
