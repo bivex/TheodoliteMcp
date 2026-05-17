@@ -2607,6 +2607,17 @@ def _draw_engineering(ax, items: List[EngineeringItem], m_per_pt: float = 0.1):
             # Cooling fins
             for i in range(-5, 6):
                 ax.plot(*zip(*[rot(i*0.07, -l_r/2), rot(i*0.07, l_r/2)]), color="#8D6E63", lw=D/3, zorder=11)
+        elif t == "boiler":
+            w_b, l_b = 0.6, 0.6
+            rect = [rot(-w_b/2, -l_b/2), rot(w_b/2, -l_b/2), rot(w_b/2, l_b/2), rot(-w_b/2, l_b/2), rot(-w_b/2, -l_b/2)]
+            ax.fill(*zip(*rect), color="#EEEEEE", alpha=0.8, zorder=10)
+            ax.plot(*zip(*rect), color="#455A64", lw=D, zorder=11)
+            # Control panel representation
+            cp = [rot(-0.2, 0.15), rot(0.2, 0.15), rot(0.2, 0.25), rot(-0.2, 0.25), rot(-0.2, 0.15)]
+            ax.plot(*zip(*cp), color="#455A64", lw=D/2, zorder=12)
+            # Burner/firebox door
+            door = [rot(-0.15, -0.2), rot(0.15, -0.2), rot(0.15, 0.1), rot(-0.15, 0.1), rot(-0.15, -0.2)]
+            ax.plot(*zip(*door), color="#455A64", lw=D/2, zorder=12)
 
         if item.label:
             ax.text(x, y + 0.25, item.label, fontproperties=_get_font(5, m_per_pt=m_per_pt), 

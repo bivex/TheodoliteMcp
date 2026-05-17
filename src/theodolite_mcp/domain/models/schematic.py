@@ -36,6 +36,8 @@ class EquipmentType:
     SHELL_TUBE_HX = "shell_tube_hx"
     PLATE_HX = "plate_hx"
     BOILER = "boiler"
+    RADIATOR = "radiator"
+    MANIFOLD = "manifold"
     EXPANSION_VESSEL = "expansion_vessel"
     STORAGE_TANK = "storage_tank"
     Y_STRAINER = "y_strainer"

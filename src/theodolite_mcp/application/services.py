@@ -77,6 +77,7 @@ class SurveyService:
         """
         report = InteriorReport(plan=plan)
         total_area = 0.0
+        total_cost = 0.0
         
         # 1. Tile calculation
         for rm in plan.rooms:
@@ -102,10 +103,24 @@ class SurveyService:
                 "type": f.type,
                 "label": f.label or "N/A",
                 "dimensions": f"{f.width}x{f.length} m",
-                "status": f.status
+                "status": f.status,
+                "price": f"{f.price or 0} {f.currency}"
             })
+            if f.price:
+                total_cost += f.price
             
-        # 4. Security List
+        # 4. Engineering List
+        for e in plan.engineering:
+            report.engineering_list.append({
+                "type": e.type,
+                "label": e.label or "N/A",
+                "level": f"{e.level} m",
+                "price": f"{e.price or 0} {e.currency}"
+            })
+            if e.price:
+                total_cost += e.price
+            
+        # 5. Security List
         for s in getattr(plan, "security", []):
             report.security_list.append({
                 "type": s.type,
@@ -114,6 +129,7 @@ class SurveyService:
                 "fov": f"{s.fov_angle}°"
             })
             
+        report.total_cost = total_cost
         return report
 
     def render_schematic(

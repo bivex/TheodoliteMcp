@@ -751,7 +751,7 @@ def draw_interior_plan(
         Optional[list[dict]],
         Field(
             default=None,
-            description="List of engineering items (socket, switch, lamp, radiator, ac, vent)",
+            description="List of engineering items (socket, switch, lamp, radiator, ac, vent, boiler)",
         ),
     ] = None,
     security_json: Annotated[
@@ -891,16 +891,18 @@ def draw_interior_plan(
 
 @mcp.tool()
 def get_interior_specifications(
-    walls_json: list[dict],
-    rooms_json: list[dict],
-    furniture_json: list[dict] = None,
+    walls_json: Annotated[list[dict], Field(..., description="List of wall definitions")],
+    rooms_json: Annotated[list[dict], Field(..., description="List of room/polygon boundaries")],
+    furniture_json: Annotated[Optional[list[dict]], Field(default=None, description="List of furniture blocks with optional price/currency")] = None,
+    engineering_json: Annotated[Optional[list[dict]], Field(default=None, description="List of engineering items (radiator, boiler, etc.) with optional price/currency")] = None,
 ) -> dict:
     """
-    Generates professional specifications: BOM, Tile calculation, and Area report.
+    Generates professional specifications: BOM, total cost estimate, Tile calculation, and Area report.
     """
     try:
         if furniture_json is None: furniture_json = []
-        
+        if engineering_json is None: engineering_json = []
+
         walls = []
         for w in walls_json:
             openings = [Opening(**op) for op in w.get("openings", [])]
@@ -912,13 +914,13 @@ def get_interior_specifications(
             rooms.append(Room(**r, points=pts))
 
         furniture = [FurnitureItem(**f) for f in furniture_json]
+        engineering = [EngineeringItem(**e) for e in engineering_json]
 
-        plan = InteriorPlan(walls=walls, rooms=rooms, furniture=furniture)
+        plan = InteriorPlan(walls=walls, rooms=rooms, furniture=furniture, engineering=engineering)
         report = service.generate_interior_report(plan)
         return report.model_dump()
     except Exception as e:
         raise ValueError(f"get_interior_specifications error: {e}") from e
-
 
 @mcp.tool()
 def draw_construction_as_built_report(
@@ -1594,7 +1596,7 @@ def draw_interior_plan_svg(
         Optional[list[dict]],
         Field(
             default=None,
-            description="List of engineering items (socket, switch, lamp, radiator, ac, vent)",
+            description="List of engineering items (socket, switch, lamp, radiator, ac, vent, boiler)",
         ),
     ] = None,
     security_json: Annotated[
@@ -1723,6 +1725,114 @@ def draw_interior_plan_svg(
 # ---------------------------------------------------------------------------
 # Pipeline Schematic Tools (ISO 6412 / ISO 14617 / ISO 3511)
 # ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def draw_heating_system(
+    boiler_label: Annotated[str, Field(default="Coal Boiler", description="Label for the boiler")] = "Coal Boiler",
+    radiator_count: Annotated[int, Field(default=3, description="Number of radiators to connect")] = 3,
+    title: Annotated[str, Field(default="Heating System Schematic", description="Drawing title")] = "Heating System Schematic",
+    language: Annotated[str, Field(default="ru", description="Language: 'ru' or 'en'")] = "ru",
+    output_path: Annotated[Optional[str], Field(default=None, description="Path to save PNG")] = None,
+) -> Image:
+    """
+    Automatically generates a professional heating system schematic (ISO 6412/14617).
+    Connects one boiler to multiple radiators via supply and return manifolds.
+    Includes pumps, valves, and expansion vessel.
+    """
+    try:
+        from theodolite_mcp.domain.models.schematic import (
+            PipelineSchematic, PipeSegment, EquipmentSymbol, ValveSymbol, 
+            EquipmentType, ValveType, PipeMedium
+        )
+        
+        pipes, equipment, valves = [], [], []
+        
+        # 1. Boiler at the left
+        equipment.append(EquipmentSymbol(
+            center_pt=Point(x=2, y=10),
+            equipment_type=EquipmentType.BOILER,
+            tag="B1",
+            label=boiler_label,
+            width=2.0,
+            height=3.0
+        ))
+        
+        # 2. Boiler Supply Line
+        pipes.append(PipeSegment(start_pt=Point(x=3, y=11), end_pt=Point(x=5, y=11), medium=PipeMedium.HEATING_SUPPLY))
+        valves.append(ValveSymbol(center_pt=Point(x=4, y=11), valve_type=ValveType.BALL, tag="V1"))
+        
+        # 3. Circulation Pump
+        equipment.append(EquipmentSymbol(
+            center_pt=Point(x=6, y=11),
+            equipment_type=EquipmentType.CIRCULATION_PUMP,
+            tag="P1",
+            label="Heating Pump",
+            width=0.8,
+            height=0.8
+        ))
+        pipes.append(PipeSegment(start_pt=Point(x=7, y=11), end_pt=Point(x=9, y=11), medium=PipeMedium.HEATING_SUPPLY))
+        
+        # 4. Supply Manifold
+        equipment.append(EquipmentSymbol(
+            center_pt=Point(x=12, y=11),
+            equipment_type=EquipmentType.MANIFOLD,
+            tag="M1",
+            label="Supply Manifold",
+            width=4.0,
+            height=0.6
+        ))
+        
+        # 5. Return Manifold
+        equipment.append(EquipmentSymbol(
+            center_pt=Point(x=12, y=5),
+            equipment_type=EquipmentType.MANIFOLD,
+            tag="M2",
+            label="Return Manifold",
+            width=4.0,
+            height=0.6
+        ))
+        
+        # 6. Radiators
+        for i in range(radiator_count):
+            rx = 10 + i * 2.5
+            # Radiator symbol
+            equipment.append(EquipmentSymbol(
+                center_pt=Point(x=rx, y=8),
+                equipment_type=EquipmentType.RADIATOR,
+                tag=f"R{i+1}",
+                width=1.2,
+                height=1.0
+            ))
+            # Connections to manifolds
+            pipes.append(PipeSegment(start_pt=Point(x=rx, y=10.7), end_pt=Point(x=rx, y=8.5), medium=PipeMedium.HEATING_SUPPLY))
+            pipes.append(PipeSegment(start_pt=Point(x=rx, y=7.5), end_pt=Point(x=rx, y=5.3), medium=PipeMedium.HEATING_RETURN))
+            
+        # 7. Return to Boiler
+        pipes.append(PipeSegment(start_pt=Point(x=10, y=5), end_pt=Point(x=3, y=5), medium=PipeMedium.HEATING_RETURN))
+        pipes.append(PipeSegment(start_pt=Point(x=3, y=5), end_pt=Point(x=3, y=8.5), medium=PipeMedium.HEATING_RETURN))
+        
+        # 8. Expansion Vessel
+        pipes.append(PipeSegment(start_pt=Point(x=5, y=5), end_pt=Point(x=5, y=3.5), medium=PipeMedium.HEATING_RETURN))
+        equipment.append(EquipmentSymbol(
+            center_pt=Point(x=5, y=3),
+            equipment_type=EquipmentType.EXPANSION_VESSEL,
+            tag="EV1",
+            width=1.0,
+            height=1.0
+        ))
+
+        plan = PipelineSchematic(
+            title=title,
+            pipes=pipes,
+            equipment=equipment,
+            valves=valves,
+            language=language
+        )
+        png_bytes = service.render_schematic(plan, output_path=output_path)
+        return Image(data=png_bytes, format="png")
+    except Exception as e:
+        raise ValueError(f"draw_heating_system error: {e}") from e
 
 
 @mcp.tool()

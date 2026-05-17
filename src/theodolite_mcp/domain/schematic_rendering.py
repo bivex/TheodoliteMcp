@@ -199,6 +199,23 @@ def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float, tracker: Op
                 angle = math.pi + t * math.pi / 10
                 arc_pts.append(_rot(cx + hw * 0.8 * math.cos(angle), cy - hh + hh * 0.15 * math.sin(angle) - hh * 0.1, cx, cy, ang))
             ax.plot(*zip(*arc_pts), color="black", lw=D, zorder=7)
+    elif et == EquipmentType.RADIATOR:
+        rect_pts = _rot_points([(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)], cx, cy, ang)
+        ax.plot(*zip(*(rect_pts + [rect_pts[0]])), color="black", lw=D_WIDE, zorder=6)
+        # Fins for radiator
+        fins = 5
+        for i in range(fins):
+            off = -hw + (i+1) * (2*hw / (fins+1))
+            ax.plot(*zip(*_rot_points([(off, -hh), (off, hh)], cx, cy, ang)), color="black", lw=D, zorder=7)
+    elif et == EquipmentType.MANIFOLD:
+        rect_pts = _rot_points([(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)], cx, cy, ang)
+        ax.fill(*zip(*rect_pts), color="#EEEEEE", alpha=0.5, zorder=5)
+        ax.plot(*zip(*(rect_pts + [rect_pts[0]])), color="black", lw=D_WIDE, zorder=6)
+        # Ports for manifold
+        ports = 4
+        for i in range(ports):
+            off = -hw + (i+1) * (2*hw / (ports+1))
+            ax.add_patch(Circle(_rot(cx + off, cy, cx, cy, ang), 0.05, ec="black", fc="white", lw=D, zorder=7))
     elif et == EquipmentType.EXPANSION_VESSEL:
         r = min(w, h) / 2
         ax.add_patch(Circle((cx, cy), r, fill=False, ec="black", lw=lw, zorder=6))

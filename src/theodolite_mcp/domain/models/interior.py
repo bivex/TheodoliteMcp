@@ -46,15 +46,19 @@ class FurnitureItem(BaseModel):
     rotation: float = 0.0  # Degrees
     status: str = "new"  # "existing", "new"
     label: Optional[str] = None
+    price: Optional[float] = None
+    currency: str = "UAH"
     ergonomics_padding: float = 0.0  # Required clear distance around object
 
 
 class EngineeringItem(BaseModel):
-    type: str  # "socket", "switch", "lamp", "radiator", "ac", "vent", "water_outlet"
+    type: str  # "socket", "switch", "lamp", "radiator", "ac", "vent", "water_outlet", "boiler"
     point: Point
     rotation: float = 0.0
     level: float = 0.0  # Height from floor
     label: Optional[str] = None
+    price: Optional[float] = None
+    currency: str = "UAH"
 
 
 class DimensionLine(BaseModel):
@@ -97,6 +101,9 @@ class InteriorReport(BaseModel):
     tile_counts: dict[str, dict[str, int]] = {}  # room_name -> {total, cut}
     material_list: list[dict[str, str]] = []
     furniture_list: list[dict[str, str]] = []
+    engineering_list: list[dict[str, str]] = []
     security_list: list[dict[str, str]] = []
     ergonomics_warnings: list[str] = []
     total_area: float = 0.0
+    total_cost: float = 0.0
+    currency: str = "UAH"
