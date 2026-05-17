@@ -569,23 +569,26 @@ class TestInputValidation:
     """Specific edge case tests that should raise errors."""
 
     def test_area_with_nan(self):
-        # NaN in coordinates should not crash; result may be NaN
+        # NaN in coordinates should now raise ValueError due to tightening
         pts = [
             {"name": "A", "x": 0, "y": 0},
             {"name": "B", "x": float("nan"), "y": 0},
             {"name": "C", "x": 10, "y": 10},
             {"name": "A", "x": 0, "y": 0},
         ]
-        compute_parcel_area(pts)  # should not raise
+        with pytest.raises(ValueError):
+            compute_parcel_area(pts)
 
     def test_area_with_inf(self):
+        # Inf in coordinates should now raise ValueError due to tightening
         pts = [
             {"name": "A", "x": 0, "y": 0},
             {"name": "B", "x": float("inf"), "y": 0},
             {"name": "C", "x": 10, "y": 10},
             {"name": "A", "x": 0, "y": 0},
         ]
-        compute_parcel_area(pts)  # should not raise
+        with pytest.raises(ValueError):
+            compute_parcel_area(pts)
 
     def test_azimuth_same_point(self):
         with pytest.raises(ValueError):
@@ -596,11 +599,11 @@ class TestInputValidation:
             Observation(horizontal_angle=90.0, distance=100.0)
 
     def test_observation_extra_field(self):
-        # Pydantic default is extra='ignore', so extra field should be accepted and ignored
-        obs = Observation(
-            point_name="P1", horizontal_angle=90.0, distance=100.0, extra_field=1
-        )
-        assert obs.point_name == "P1"
+        # We tightened Observation to forbid extra fields
+        with pytest.raises(ValidationError):
+            Observation(
+                point_name="P1", horizontal_angle=90.0, distance=100.0, extra_field=1
+            )
 
     def test_traverse_missing_start(self):
         # Missing required start_x, start_y would be TypeError before; but we need to test as arguments are required

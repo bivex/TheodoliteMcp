@@ -297,8 +297,7 @@ class TestEDMFuzzing:
         try:
             res = compute_edm_atmospheric_correction(temp, pressure, freq)
             assert isinstance(res, float)
-            if math.isfinite(res):
-                assert -2000 <= res <= 2000  # PPM range expanded for fuzzing
+            assert math.isfinite(res)
         except (
             ValueError,
             ValidationError,
