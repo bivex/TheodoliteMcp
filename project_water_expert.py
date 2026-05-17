@@ -51,8 +51,8 @@ valves = [
 
 instruments = [
     # Автоматика - рознесена далеко від GA-1
-    {"center_pt": {"x": 8.5, "y": 8.5}, "measured_variable": "P", "suffix": "I", "tag_number": "01"},
-    {"center_pt": {"x": 11.5, "y": 8.5}, "measured_variable": "P", "suffix": "C", "tag_number": "01"},
+    {"center_pt": {"x": 9.5, "y": 5.6}, "measured_variable": "P", "suffix": "I", "tag_number": "01"},
+    {"center_pt": {"x": 10.5, "y": 5.6}, "measured_variable": "P", "suffix": "C", "tag_number": "01"},
 ]
 
 try:
