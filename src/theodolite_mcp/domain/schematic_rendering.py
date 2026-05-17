@@ -297,6 +297,8 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
         "LA": {"uk": "LA - Авт. повітровідвідник", "ru": "LA - Авт. воздухоотводчик", "en": "LA - Auto Air Vent"},
         "LM": {"uk": "LM - Кран Маєвського", "ru": "LM - Кран Маевского", "en": "LM - Manual Air Vent"},
         "PC": {"uk": "PC - Реле тиску (Контролер)", "ru": "PC - Реле давления", "en": "PC - Pressure Controller"},
+        "AA": {"uk": "AA - CO-сигналізатор (Аналіз-Тривога)", "ru": "AA - CO-сигнализатор (Анализ-Тревога)", "en": "AA - CO Alarm (Analysis-Alarm)"},
+        "SA": {"uk": "SA - Датчик диму (Дим-Тривога)", "ru": "SA - Датчик дыма (Дым-Тревога)", "en": "SA - Smoke Alarm"},
     }
     prefixes_used = set()
     for v in plan.valves:
@@ -326,7 +328,9 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
         "P": {"uk": "P - Тиск", "ru": "P - Давление", "en": "P - Pressure"},
         "T": {"uk": "T - Температура", "ru": "T - Температура", "en": "T - Temperature"},
         "F": {"uk": "F - Витрата", "ru": "F - Расход", "en": "F - Flow"},
-        "Q": {"uk": "Q - Енергія/Тепло", "ru": "Q - Энергия/Тепло", "en": "Q - Energy/Heat"}
+        "Q": {"uk": "Q - Енергія/Тепло", "ru": "Q - Энергия/Тепло", "en": "Q - Energy/Heat"},
+        "A": {"uk": "A - Аналіз (CO та інше)", "ru": "A - Анализ (CO и др.)", "en": "A - Analysis (CO etc.)"},
+        "S": {"uk": "S - Дим", "ru": "S - Дым", "en": "S - Smoke"},
     }
     vars_used = set()
 
@@ -358,9 +362,29 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
         elif lang == "ru": label = ru_e.get(e, label)
         items.append(("equipment", e, label, None))
         
-    if instr: 
+    if instr:
         lbl = "КВПіА" if lang == "uk" else ("КИПиА" if lang == "ru" else "P&ID")
         items.append(("instrument", "iso3511", lbl, None))
+    # Safety zone color explanations
+    safety_notes_uk = {
+        "#FF6600": "Помаранч. рамка — безпечна зона 0.5 м",
+        "#CC0000": "Червона рамка — протипожежна шахта",
+    }
+    safety_notes_ru = {
+        "#FF6600": "Оранж. рамка — безопасная зона 0.5 м",
+        "#CC0000": "Красная рамка — противопожарная шахта",
+    }
+    safety_notes_en = {
+        "#FF6600": "Orange box — safety zone 0.5 m",
+        "#CC0000": "Red box — fireproof shaft",
+    }
+    sn_map = safety_notes_uk if lang == "uk" else (safety_notes_ru if lang == "ru" else safety_notes_en)
+    colors_used = set()
+    for p in plan.pipes:
+        if p.custom_color and p.show_dn_label is False and p.custom_color in sn_map:
+            colors_used.add(p.custom_color)
+    for c in sorted(colors_used):
+        items.append(("note", c, sn_map[c], None))
     if not items: return
     row_h, legend_w = 9.0, 95.0
     legend_h = (len(items) + 1.5) * row_h
