@@ -116,7 +116,7 @@ def _draw_pipe_segment(ax, pipe: PipeSegment, m_per_pt: float):
         nx, ny = -dy / seg_len, dx / seg_len
         offset = 0.08
         ax.text(mx + nx * offset, my + ny * offset, f"DN{pipe.nominal_diameter}",
-                fontproperties=_get_font(4, m_per_pt=m_per_pt),
+                fontproperties=_get_font(8, m_per_pt=m_per_pt),
                 ha="center", va="center", color=color, zorder=5)
 
 
@@ -227,7 +227,7 @@ def _draw_valve_symbol(ax, valve: ValveSymbol, m_per_pt: float):
     if valve.tag:
         tag_pos = _rot(cx, cy + s * 1.5, cx, cy, ang)
         ax.text(tag_pos[0], tag_pos[1], valve.tag,
-                fontproperties=_get_font(4.5, bold=True, m_per_pt=m_per_pt),
+                fontproperties=_get_font(10, bold=True, m_per_pt=m_per_pt),
                 ha="center", va="bottom", color="black", zorder=8,
                 bbox=dict(boxstyle="round,pad=0.05", fc="white", ec="none", alpha=0.8))
 
@@ -364,7 +364,7 @@ def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float):
         ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color="black", lw=D, zorder=7)
         # "P" label
         ax.text(cx, cy - r * 0.3, "P",
-                fontproperties=_get_font(5, bold=True, m_per_pt=m_per_pt),
+                fontproperties=_get_font(12, bold=True, m_per_pt=m_per_pt),
                 ha="center", va="center", color="black", zorder=8)
 
     elif et == EquipmentType.THERMOMETER:
@@ -386,7 +386,7 @@ def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float):
         ax.add_patch(circle)
         # F inside
         ax.text(cx, cy, "F",
-                fontproperties=_get_font(6, bold=True, m_per_pt=m_per_pt),
+                fontproperties=_get_font(12, bold=True, m_per_pt=m_per_pt),
                 ha="center", va="center", color="black", zorder=8)
 
     elif et == EquipmentType.HEAT_METER:
@@ -395,7 +395,7 @@ def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float):
         ax.add_patch(circle)
         # Q inside
         ax.text(cx, cy, "Q",
-                fontproperties=_get_font(6, bold=True, m_per_pt=m_per_pt),
+                fontproperties=_get_font(12, bold=True, m_per_pt=m_per_pt),
                 ha="center", va="center", color="black", zorder=8)
 
     # Tag + label
@@ -403,13 +403,13 @@ def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float):
     if eq.tag:
         tag_pos = _rot(cx, cy + tag_offset, cx, cy, ang)
         ax.text(tag_pos[0], tag_pos[1], eq.tag,
-                fontproperties=_get_font(4.5, bold=True, m_per_pt=m_per_pt),
+                fontproperties=_get_font(10, bold=True, m_per_pt=m_per_pt),
                 ha="center", va="bottom", color="black", zorder=8,
                 bbox=dict(boxstyle="round,pad=0.05", fc="white", ec="none", alpha=0.8))
     if eq.label:
         lbl_pos = _rot(cx, cy - tag_offset, cx, cy, ang)
         ax.text(lbl_pos[0], lbl_pos[1], eq.label,
-                fontproperties=_get_font(4, m_per_pt=m_per_pt),
+                fontproperties=_get_font(8, m_per_pt=m_per_pt),
                 ha="center", va="top", color="#333333", zorder=8)
 
 
@@ -504,7 +504,7 @@ def _draw_instrument_bubble(ax, instr: InstrumentSymbol, m_per_pt: float):
 
     # Tag text inside bubble
     ax.text(cx, cy, tag,
-            fontproperties=_get_font(3.5, bold=True, m_per_pt=m_per_pt),
+            fontproperties=_get_font(8, bold=True, m_per_pt=m_per_pt),
             ha="center", va="center", color="black", zorder=8)
 
 
@@ -572,42 +572,44 @@ def _draw_symbol_legend(ax, plan: PipelineSchematic, m_per_pt: float):
     if n_items == 0:
         return
 
-    row_h = 0.12
-    legend_w = 1.2
-    legend_h = n_items * row_h + row_h
+    row_h = 0.25  # Was 0.12
+    legend_w = 2.5  # Was 1.2
+    legend_h = n_items * row_h + row_h * 1.5
 
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
-    lx = xlim[1] - legend_w - 0.1
-    ly = ylim[1] - 0.1
+    # Anchor to top-right with margin
+    lx = xlim[1] - legend_w - 0.2
+    ly = ylim[1] - 0.2
 
     # Background
     rect = Rectangle((lx, ly - legend_h), legend_w, legend_h,
-                      fc="white", ec="black", lw=D, alpha=0.9, zorder=9)
+                      fc="white", ec="black", lw=D_WIDE, alpha=0.9, zorder=9)
     ax.add_patch(rect)
 
     # Title
     title = "УСЛОВНЫЕ ОБОЗНАЧЕНИЯ" if lang == "ru" else "SYMBOL LEGEND"
-    ax.text(lx + legend_w / 2, ly - row_h * 0.5, title,
-            fontproperties=_get_font(4.5, bold=True, m_per_pt=m_per_pt),
+    ax.text(lx + legend_w / 2, ly - row_h * 0.7, title,
+            fontproperties=_get_font(12, bold=True, m_per_pt=m_per_pt),
             ha="center", va="center", color="black", zorder=10)
 
     for i, (itype, key, label, style) in enumerate(items):
-        ry = ly - row_h * (i + 1.5)
-        sample_x = lx + 0.15
-        text_x = lx + 0.35
+        ry = ly - row_h * (i + 2.0)
+        sample_x = lx + 0.3
+        text_x = lx + 0.7
 
         if itype == "pipe" and style:
-            ax.plot([sample_x - 0.08, sample_x + 0.08], [ry, ry],
+            ax.plot([sample_x - 0.15, sample_x + 0.15], [ry, ry],
                     color=style["color"], linestyle=style["ls"],
-                    linewidth=D_WIDE, zorder=10)
+                    linewidth=D_WIDE * 1.5, zorder=10)
         elif itype in ("valve", "equipment", "instrument"):
-            ax.plot([sample_x - 0.06, sample_x + 0.06], [ry, ry],
-                    color="black", linewidth=D_SYMBOL, zorder=10)
-            ax.plot(sample_x, ry, "s", color="black", markersize=2, zorder=10)
+            # Larger sample symbol
+            ax.plot([sample_x - 0.12, sample_x + 0.12], [ry, ry],
+                    color="black", linewidth=D_SYMBOL * 1.5, zorder=10)
+            ax.plot(sample_x, ry, "s", color="black", markersize=4, zorder=10)
 
         ax.text(text_x, ry, label,
-                fontproperties=_get_font(3.5, m_per_pt=m_per_pt),
+                fontproperties=_get_font(10, m_per_pt=m_per_pt),
                 ha="left", va="center", color="black", zorder=10)
 
 
@@ -675,7 +677,8 @@ def render_pipeline_schematic(plan: PipelineSchematic, output_format: str = "png
     data_h = max(max_y - min_y, 0.1)
 
     scale = plan.scale
-    m_per_mm = 1.0 / (scale * MM_TO_PT) * MM_TO_PT
+    # 1:scale means 1mm on paper = scale mm in reality = scale/1000.0 meters in reality.
+    m_per_mm = scale / 1000.0
     m_per_pt = m_per_mm / MM_TO_PT
 
     # Center data in drawing area
