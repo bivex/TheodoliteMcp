@@ -41,41 +41,46 @@ def create_3room_security_demo():
 
     # --- 🛡️ PREMIUM SECURITY SYSTEM LAYER 🛡️ ---
     security = [
-        # 1. Main Hub / Entrance
-        SecurityItem(type="keypad", point=Point(x=3.8, y=0.5), rotation=0, label="Alarm Panel"),
-        SecurityItem(type="door_sensor", point=Point(x=4.0, y=1.0), label="Entry Door Sensor"),
+        # 1. Main Hub / Entrance (Охранная панель и геркон)
+        SecurityItem(type="keypad", point=Point(x=0.2, y=5.5), rotation=0, label="Ajax Hub"),
+        SecurityItem(type="door_sensor", point=Point(x=0.0, y=5.0), label="Door Protect"),
         
-        # 2. Cameras (Based on recommendations)
-        # Using EZVIZ C6N (PTZ, Smart Tracking) for the main living area - high traffic
+        # 2. Cameras (Видеонаблюдение - Топ выбор)
+        # EZVIZ C6N (PTZ 360°, Smart Tracking) - Гостиная/Кухня. 
+        # Установлена в верхнем левом углу, покрывает 90% центральной зоны и вход в коридор.
         SecurityItem(
-            type="camera", point=Point(x=4.2, y=9.8), rotation=315, 
-            fov_angle=120, range=8.0, label="EZVIZ C6N (360° Living Rm)"
+            type="camera", point=Point(x=4.2, y=9.8), rotation=315, # Смотрит на Юго-Восток
+            fov_angle=110, range=8.5, label="EZVIZ C6N 1080p (PTZ)"
         ),
         
-        # Using Xiaomi YI Home 2K Pro (Fixed, High Res) for the hallway and entrance monitoring
+        # Xiaomi YI Home 2K Pro (Fixed, High Res) - Коридор.
+        # Установлена над входной дверью, смотрит вглубь коридора. Идеально для идентификации лиц.
         SecurityItem(
-            type="camera", point=Point(x=3.8, y=5.8), rotation=225, 
-            fov_angle=110, range=5.0, label="Xiaomi 2K Pro (Hallway)"
+            type="camera", point=Point(x=0.2, y=5.8), rotation=340, # Смотрит на Восток
+            fov_angle=110, range=6.0, label="Xiaomi YI 2K Pro (Entrance)"
         ),
         
-        # Second Xiaomi YI Home 2K Pro for the small room/office window
+        # Вторая Xiaomi YI Home 2K Pro - Мастер спальня.
+        # Установлена в дальнем углу, контролирует окно и подходы к кровати.
         SecurityItem(
-            type="camera", point=Point(x=7.8, y=3.8), rotation=135, 
-            fov_angle=110, range=5.0, label="Xiaomi 2K Pro (Office/Kids)"
+            type="camera", point=Point(x=11.8, y=9.8), rotation=225, # Смотрит на Юго-Запад
+            fov_angle=110, range=7.0, label="Xiaomi YI 2K Pro (Bedroom)"
         ),
 
-        # 3. Motion Sensors (PIR) for cross-coverage
+        # 3. Motion Sensors (Датчики движения PIR для перекрестного покрытия)
+        # Если камеру ослепят или закроют, PIR в другом углу поймает движение.
         SecurityItem(
-            type="motion_sensor", point=Point(x=0.2, y=0.2), rotation=45, 
-            range=5.0, fov_angle=90, label="PIR - Living Room"
+            type="motion_sensor", point=Point(x=7.8, y=0.2), rotation=135, # Смотрит на Северо-Запад
+            range=6.0, fov_angle=100, label="MotionCam (Kitchen)"
         ),
         SecurityItem(
-            type="motion_sensor", point=Point(x=11.8, y=9.8), rotation=225, 
-            range=5.0, fov_angle=90, label="PIR - Master Bedroom"
+            type="motion_sensor", point=Point(x=11.8, y=0.2), rotation=135, 
+            range=6.0, fov_angle=100, label="Motion Protect (Bed)"
         ),
 
-        # 4. Siren
-        SecurityItem(type="siren", point=Point(x=6.0, y=5.0), label="Main Siren 120dB")
+        # 4. Siren (Сирена)
+        # В центре квартиры для максимального звукового давления во все комнаты.
+        SecurityItem(type="siren", point=Point(x=6.0, y=5.0), label="HomeSiren 105dB")
     ]
 
     # 4. Render
