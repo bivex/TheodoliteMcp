@@ -230,7 +230,7 @@ def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float, tracker: Op
         lbl = {"pressure_gauge": "P", "thermometer": "T", "flow_meter": "F", "heat_meter": "Q"}.get(et, "")
         ax.text(cx, cy, lbl, fontproperties=_get_font(12, bold=True, m_per_pt=m_per_pt), ha="center", va="center", color="black", zorder=8)
     
-    tag_offset = max(w, h) / 2 + 0.5
+    tag_offset = (h / 2 + 0.4) if et == EquipmentType.MANIFOLD else (max(w, h) / 2 + 0.5)
     if eq.tag:
         txt, best_pos = eq.tag, _rot(cx, cy + tag_offset, cx, cy, ang)
         if tracker:
@@ -294,13 +294,25 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
         "T": {"uk": "T - Резервуар", "ru": "T - Резервуар", "en": "T - Tank"},
         "M": {"uk": "M - Колектор / Гребінка", "ru": "M - Коллектор / Гребенка", "en": "M - Manifold"},
         "PI": {"uk": "PI - Манометр (Індикатор)", "ru": "PI - Манометр", "en": "PI - Pressure Indicator"},
+        "LA": {"uk": "LA - Авт. повітровідвідник", "ru": "LA - Авт. воздухоотводчик", "en": "LA - Auto Air Vent"},
+        "LM": {"uk": "LM - Кран Маєвського", "ru": "LM - Кран Маевского", "en": "LM - Manual Air Vent"},
         "PC": {"uk": "PC - Реле тиску (Контролер)", "ru": "PC - Реле давления", "en": "PC - Pressure Controller"},
     }
     prefixes_used = set()
     for v in plan.valves:
-        if v.tag and "-" in v.tag: prefixes_used.add(v.tag.split("-")[0].upper())
+        if v.tag:
+            tag = v.tag.upper()
+            if "-" in tag: prefixes_used.add(tag.split("-")[0])
+            else:
+                for pfx in prefix_map:
+                    if tag.startswith(pfx): prefixes_used.add(pfx); break
     for e in plan.equipment:
-        if e.tag and "-" in e.tag: prefixes_used.add(e.tag.split("-")[0].upper())
+        if e.tag:
+            tag = e.tag.upper()
+            if "-" in tag: prefixes_used.add(tag.split("-")[0])
+            else:
+                for pfx in prefix_map:
+                    if tag.startswith(pfx): prefixes_used.add(pfx); break
     for i in plan.instruments:
         pfx = f"{i.measured_variable}{i.suffix or ''}".upper().strip()
         if pfx: prefixes_used.add(pfx)

@@ -1770,10 +1770,10 @@ def draw_heating_system(
         pipes.append(PipeSegment(start_pt=Point(x=3, y=9.5), end_pt=Point(x=8, y=9.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=32))
         valves.append(ValveSymbol(center_pt=Point(x=4, y=9.5), valve_type=ValveType.BALL, tag="V1"))
         
-        # Safety Valve (PRV) with Drainage
+        # Safety Valve (PRV) with Drainage (Downwards)
         pipes.append(PipeSegment(start_pt=Point(x=5, y=9.5), end_pt=Point(x=5, y=10.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=20))
         valves.append(ValveSymbol(center_pt=Point(x=5, y=10.5), valve_type=ValveType.SAFETY_RELIEF, tag="PRV1"))
-        pipes.append(PipeSegment(start_pt=Point(x=5, y=10.5), end_pt=Point(x=5, y=11.5), medium=PipeMedium.DRAINAGE, nominal_diameter=15))
+        pipes.append(PipeSegment(start_pt=Point(x=5, y=10.5), end_pt=Point(x=5, y=9.0), medium=PipeMedium.DRAINAGE, nominal_diameter=15))
         
         # Pressure Gauge
         instruments.append(InstrumentSymbol(center_pt=Point(x=6, y=10.5), measured_variable="P", tag_number="01"))
@@ -1789,9 +1789,9 @@ def draw_heating_system(
             width=m_width,
             height=0.6
         ))
-        # Air vent on supply manifold
+        # Air vent on supply manifold (right end)
         pipes.append(PipeSegment(start_pt=Point(x=12 + m_width/2, y=9.5), end_pt=Point(x=12 + m_width/2, y=10.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=15))
-        instruments.append(InstrumentSymbol(center_pt=Point(x=12 + m_width/2, y=10.5), measured_variable="L", suffix="A", tag_number="01")) # Air vent
+        instruments.append(InstrumentSymbol(center_pt=Point(x=12 + m_width/2, y=10.5), measured_variable="L", suffix="A", tag_number="01"))
 
         # 4. Return Manifold
         equipment.append(EquipmentSymbol(
@@ -1814,6 +1814,10 @@ def draw_heating_system(
                 width=1.0,
                 height=0.8
             ))
+            # Air vent on each radiator (Maevsky)
+            pipes.append(PipeSegment(start_pt=Point(x=rx + 0.4, y=7.4), end_pt=Point(x=rx + 0.4, y=7.8), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=15))
+            instruments.append(InstrumentSymbol(center_pt=Point(x=rx + 0.4, y=7.8), measured_variable="L", suffix="M", tag_number=f"{i+1}"))
+
             pipes.append(PipeSegment(start_pt=Point(x=rx, y=9.2), end_pt=Point(x=rx, y=7.4), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=20))
             valves.append(ValveSymbol(center_pt=Point(x=rx, y=8.5), valve_type=ValveType.GLOBE, tag=f"VR{i+1}s"))
             pipes.append(PipeSegment(start_pt=Point(x=rx, y=6.6), end_pt=Point(x=rx, y=4.8), medium=PipeMedium.HEATING_RETURN, nominal_diameter=20))
