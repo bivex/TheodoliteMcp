@@ -273,17 +273,19 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
         "GA": ("GA - Гідроакумулятор" if lang == "uk" else "GA - Expansion Vessel"),
         "P": ("P - Насос" if lang == "uk" else "P - Pump"),
         "T": ("T - Резервуар" if lang == "uk" else "T - Tank"),
+        "PI": ("PI - Манометр (Індикатор)" if lang == "uk" else "PI - Pressure Indicator"),
+        "PC": ("PC - Реле тиску (Контролер)" if lang == "uk" else "PC - Pressure Controller"),
     }
     prefixes_used = set()
     for v in plan.valves:
         if v.tag and "-" in v.tag: prefixes_used.add(v.tag.split("-")[0].upper())
     for e in plan.equipment:
         if e.tag and "-" in e.tag: prefixes_used.add(e.tag.split("-")[0].upper())
+    for i in plan.instruments:
+        pfx = f"{i.measured_variable}{i.suffix or ''}".upper().strip()
+        if pfx: prefixes_used.add(pfx)
     
     for pfx in sorted(list(prefixes_used)):
-        # Don't overwrite instrument 'P' if it's already used, we'll handle it by just adding it.
-        # But 'P' is used for both Pump and Pressure. In P&ID, P is often pump. 
-        # We will add it safely.
         if pfx in prefix_map and not any(k == pfx for t, k, l, s in items):
             items.append(("note", pfx, prefix_map[pfx], None))
 
@@ -312,14 +314,14 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
         items.append(("equipment", e, label, None))
     if instr: items.append(("instrument", "iso3511", "КВПіА" if lang == "uk" else "P&ID", None))
     if not items: return
-    row_h, legend_w = 12.0, 110.0
+    row_h, legend_w = 12.0, 120.0
     legend_h = (len(items) + 1.2) * row_h
     lx, ly = pw_mm - MARGIN_OTHER - legend_w - 5, ph_mm - MARGIN_OTHER - legend_h - 5
     ax_leg = fig.add_axes([lx/pw_mm, ly/ph_mm, legend_w/pw_mm, legend_h/ph_mm])
     ax_leg.set_xlim(0, legend_w); ax_leg.set_ylim(0, legend_h); ax_leg.axis("off")
     ax_leg.add_patch(Rectangle((0, 0), legend_w, legend_h, fc="white", ec="black", lw=D_WIDE, alpha=0.9, zorder=9))
     title = "УМОВНІ ПОЗНАЧЕННЯ" if lang == "uk" else "SYMBOL LEGEND"
-    ax_leg.text(legend_w/2, legend_h - row_h*0.6, title, fontproperties=_get_font(12, bold=True, lang=lang), ha="center", va="center", zorder=10)
+    ax_leg.text(legend_w/2, legend_h - row_h*0.6, title, fontproperties=_get_font(10, bold=True, lang=lang), ha="center", va="center", zorder=10)
     leg_m_per_pt = 1.0 / MM_TO_PT 
     for i, (itype, key, label, style) in enumerate(items):
         ry, sx, tx = legend_h - row_h*(i + 1.8), 12.0, 32.0
