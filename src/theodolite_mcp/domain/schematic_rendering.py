@@ -264,8 +264,32 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
     items = []
     for m in media: items.append(("pipe", m, MEDIA_STYLES.get(m, MEDIA_STYLES[PipeMedium.CUSTOM]).get(f"label_{lang}", m), MEDIA_STYLES.get(m)))
     if media: items.append(("note", "DN", "DN - Номінальний діаметр (мм)" if lang == "uk" else "DN - Nominal Diameter (mm)", None))
+    # Tag prefixes explanation
+    prefix_map = {
+        "V": ("V - Кран / Вентиль" if lang == "uk" else "V - Valve"),
+        "CV": ("CV - Зворотний клапан" if lang == "uk" else "CV - Check Valve"),
+        "F": ("F - Фільтр" if lang == "uk" else "F - Filter"),
+        "B": ("B - Бойлер / Котел" if lang == "uk" else "B - Boiler"),
+        "GA": ("GA - Гідроакумулятор" if lang == "uk" else "GA - Expansion Vessel"),
+        "P": ("P - Насос" if lang == "uk" else "P - Pump"),
+        "T": ("T - Резервуар" if lang == "uk" else "T - Tank"),
+    }
+    prefixes_used = set()
+    for v in plan.valves:
+        if v.tag and "-" in v.tag: prefixes_used.add(v.tag.split("-")[0].upper())
+    for e in plan.equipment:
+        if e.tag and "-" in e.tag: prefixes_used.add(e.tag.split("-")[0].upper())
+    
+    for pfx in sorted(list(prefixes_used)):
+        # Don't overwrite instrument 'P' if it's already used, we'll handle it by just adding it.
+        # But 'P' is used for both Pump and Pressure. In P&ID, P is often pump. 
+        # We will add it safely.
+        if pfx in prefix_map and not any(k == pfx for t, k, l, s in items):
+            items.append(("note", pfx, prefix_map[pfx], None))
+
     var_map = {"P": ("P - Тиск" if lang == "uk" else "P - Pressure"), "T": ("T - Температура" if lang == "uk" else "T - Temperature"), "F": ("F - Витрата" if lang == "uk" else "F - Flow"), "Q": ("Q - Енергія/Тепло" if lang == "uk" else "Q - Energy/Heat")}
     vars_used = set()
+
     for i in plan.instruments: vars_used.add(i.measured_variable)
     for e in plan.equipment:
         if e.equipment_type == EquipmentType.PRESSURE_GAUGE: vars_used.add("P")
