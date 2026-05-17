@@ -289,9 +289,10 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
         "CV": {"uk": "CV - Зворотний клапан", "ru": "CV - Обратный клапан", "en": "CV - Check Valve"},
         "F": {"uk": "F - Фільтр", "ru": "F - Фильтр", "en": "F - Filter"},
         "B": {"uk": "B - Бойлер / Котел", "ru": "B - Бойлер / Котел", "en": "B - Boiler"},
-        "GA": {"uk": "GA - Гідроакумулятор", "ru": "GA - Гидроаккумулятор", "en": "GA - Expansion Vessel"},
+        "GA": {"uk": "GA - Розширювальний бак", "ru": "GA - Расширительный бак", "en": "GA - Expansion Vessel"},
         "P": {"uk": "P - Насос", "ru": "P - Насос", "en": "P - Pump"},
         "T": {"uk": "T - Резервуар", "ru": "T - Резервуар", "en": "T - Tank"},
+        "M": {"uk": "M - Колектор / Гребінка", "ru": "M - Коллектор / Гребенка", "en": "M - Manifold"},
         "PI": {"uk": "PI - Манометр (Індикатор)", "ru": "PI - Манометр", "en": "PI - Pressure Indicator"},
         "PC": {"uk": "PC - Реле тиску (Контролер)", "ru": "PC - Реле давления", "en": "PC - Pressure Controller"},
     }
@@ -336,8 +337,8 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
         elif lang == "ru": label = ru_v.get(v, label)
         items.append(("valve", v, label, None))
 
-    uk_e = {"boiler": "Бойлер/Котел", "centrifugal_pump": "Насос", "circulation_pump": "Циркуляційний насос", "expansion_vessel": "Гідроакумулятор", "mesh_filter": "Фільтр", "storage_tank": "Резервуар", "pressure_gauge": "Манометр", "thermometer": "Термометр", "flow_meter": "Витратомір", "heat_meter": "Теплолічильник", "radiator": "Радіатор", "manifold": "Колектор"}
-    ru_e = {"boiler": "Бойлер/Котел", "centrifugal_pump": "Насос", "circulation_pump": "Циркуляционный насос", "expansion_vessel": "Гидроаккумулятор", "mesh_filter": "Фильтр", "storage_tank": "Резервуар", "pressure_gauge": "Манометр", "thermometer": "Термометр", "flow_meter": "Расходомер", "heat_meter": "Теплосчетчик", "radiator": "Радиатор", "manifold": "Коллектор"}
+    uk_e = {"boiler": "Бойлер/Котел", "centrifugal_pump": "Насос", "circulation_pump": "Циркуляційний насос", "expansion_vessel": "Розширювальний бак", "mesh_filter": "Фільтр", "storage_tank": "Резервуар", "pressure_gauge": "Манометр", "thermometer": "Термометр", "flow_meter": "Витратомір", "heat_meter": "Теплолічильник", "radiator": "Радіатор", "manifold": "Колектор"}
+    ru_e = {"boiler": "Бойлер/Котел", "centrifugal_pump": "Насос", "circulation_pump": "Циркуляционный насос", "expansion_vessel": "Расширительный бак", "mesh_filter": "Фильтр", "storage_tank": "Резервуар", "pressure_gauge": "Манометр", "thermometer": "Термометр", "flow_meter": "Расходомер", "heat_meter": "Теплосчетчик", "radiator": "Радиатор", "manifold": "Коллектор"}
     
     for e in equip:
         label = e.replace("_", " ").title()

@@ -1748,9 +1748,9 @@ def draw_heating_system(
         
         # Localized labels
         labels = {
-            "en": {"pump": "Heating Pump", "s_manifold": "Supply Manifold", "r_manifold": "Return Manifold", "safety": "Safety Group"},
-            "uk": {"pump": "Циркуляційний насос", "s_manifold": "Подаючий колектор", "r_manifold": "Зворотній колектор", "safety": "Група безпеки"},
-            "ru": {"pump": "Циркуляционный насос", "s_manifold": "Подающий коллектор", "r_manifold": "Обратный коллектор", "safety": "Группа безопасности"},
+            "en": {"pump": "Heating Pump", "s_manifold": "Supply Manifold", "r_manifold": "Return Manifold"},
+            "uk": {"pump": "Циркуляційний насос", "s_manifold": "Подаючий колектор", "r_manifold": "Зворотній колектор"},
+            "ru": {"pump": "Циркуляционный насос", "s_manifold": "Подающий коллектор", "r_manifold": "Обратный коллектор"},
         }
         l = labels.get(language, labels["en"])
         
@@ -1770,9 +1770,10 @@ def draw_heating_system(
         pipes.append(PipeSegment(start_pt=Point(x=3, y=9.5), end_pt=Point(x=8, y=9.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=32))
         valves.append(ValveSymbol(center_pt=Point(x=4, y=9.5), valve_type=ValveType.BALL, tag="V1"))
         
-        # Safety Valve (PRV) - connected as a branch
+        # Safety Valve (PRV) with Drainage
         pipes.append(PipeSegment(start_pt=Point(x=5, y=9.5), end_pt=Point(x=5, y=10.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=20))
         valves.append(ValveSymbol(center_pt=Point(x=5, y=10.5), valve_type=ValveType.SAFETY_RELIEF, tag="PRV1"))
+        pipes.append(PipeSegment(start_pt=Point(x=5, y=10.5), end_pt=Point(x=5, y=11.5), medium=PipeMedium.DRAINAGE, nominal_diameter=15))
         
         # Pressure Gauge
         instruments.append(InstrumentSymbol(center_pt=Point(x=6, y=10.5), measured_variable="P", tag_number="01"))
@@ -1788,7 +1789,10 @@ def draw_heating_system(
             width=m_width,
             height=0.6
         ))
-        
+        # Air vent on supply manifold
+        pipes.append(PipeSegment(start_pt=Point(x=12 + m_width/2, y=9.5), end_pt=Point(x=12 + m_width/2, y=10.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=15))
+        instruments.append(InstrumentSymbol(center_pt=Point(x=12 + m_width/2, y=10.5), measured_variable="L", suffix="A", tag_number="01")) # Air vent
+
         # 4. Return Manifold
         equipment.append(EquipmentSymbol(
             center_pt=Point(x=12, y=4.5),
@@ -1799,11 +1803,10 @@ def draw_heating_system(
             height=0.6
         ))
         
-        # 5. Radiators with proper connectivity
+        # 5. Radiators
         m_start_x = 12 - m_width/2 + 0.75
         for i in range(radiator_count):
             rx = m_start_x + i * 1.5
-            # Radiator symbol
             equipment.append(EquipmentSymbol(
                 center_pt=Point(x=rx, y=7),
                 equipment_type=EquipmentType.RADIATOR,
@@ -1811,18 +1814,15 @@ def draw_heating_system(
                 width=1.0,
                 height=0.8
             ))
-            # Supply connection (DN20)
             pipes.append(PipeSegment(start_pt=Point(x=rx, y=9.2), end_pt=Point(x=rx, y=7.4), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=20))
-            valves.append(ValveSymbol(center_pt=Point(x=rx, y=8.5), valve_type=ValveType.GLOBE, tag=f"VR{i+1}s")) # Control valve
-            
-            # Return connection (DN20)
+            valves.append(ValveSymbol(center_pt=Point(x=rx, y=8.5), valve_type=ValveType.GLOBE, tag=f"VR{i+1}s"))
             pipes.append(PipeSegment(start_pt=Point(x=rx, y=6.6), end_pt=Point(x=rx, y=4.8), medium=PipeMedium.HEATING_RETURN, nominal_diameter=20))
-            valves.append(ValveSymbol(center_pt=Point(x=rx, y=5.5), valve_type=ValveType.BALL, tag=f"VR{i+1}r")) # Shut-off
+            valves.append(ValveSymbol(center_pt=Point(x=rx, y=5.5), valve_type=ValveType.BALL, tag=f"VR{i+1}r"))
             
-        # 6. Return Line to Boiler with Pump and EV
+        # 6. Return Line to Boiler
         pipes.append(PipeSegment(start_pt=Point(x=12 - m_width/2, y=4.5), end_pt=Point(x=3, y=4.5), medium=PipeMedium.HEATING_RETURN, nominal_diameter=32))
         
-        # Pump on Return line
+        # Pump on Return
         equipment.append(EquipmentSymbol(
             center_pt=Point(x=6, y=4.5),
             equipment_type=EquipmentType.CIRCULATION_PUMP,
@@ -1831,10 +1831,10 @@ def draw_heating_system(
             width=0.8,
             height=0.8
         ))
-        valves.append(ValveSymbol(center_pt=Point(x=5, y=4.5), valve_type=ValveType.BALL, tag="V2")) # Before pump
-        valves.append(ValveSymbol(center_pt=Point(x=7, y=4.5), valve_type=ValveType.BALL, tag="V3")) # After pump
+        valves.append(ValveSymbol(center_pt=Point(x=5, y=4.5), valve_type=ValveType.BALL, tag="V2"))
+        valves.append(ValveSymbol(center_pt=Point(x=7, y=4.5), valve_type=ValveType.BALL, tag="V3"))
         
-        # Expansion Vessel (Parallel connection)
+        # Expansion Vessel (Parallel)
         pipes.append(PipeSegment(start_pt=Point(x=8, y=4.5), end_pt=Point(x=8, y=3.0), medium=PipeMedium.HEATING_RETURN, nominal_diameter=20))
         equipment.append(EquipmentSymbol(
             center_pt=Point(x=8, y=2.5),
@@ -1844,7 +1844,11 @@ def draw_heating_system(
             height=1.2
         ))
         
-        # Connect return to boiler entry
+        # Drain valve at lowest point
+        pipes.append(PipeSegment(start_pt=Point(x=4, y=4.5), end_pt=Point(x=4, y=3.5), medium=PipeMedium.HEATING_RETURN, nominal_diameter=15))
+        valves.append(ValveSymbol(center_pt=Point(x=4, y=3.5), valve_type=ValveType.BALL, tag="V-Drain"))
+
+        # Connect return to boiler
         pipes.append(PipeSegment(start_pt=Point(x=3, y=4.5), end_pt=Point(x=3, y=6.5), medium=PipeMedium.HEATING_RETURN, nominal_diameter=32))
         valves.append(ValveSymbol(center_pt=Point(x=3, y=5.5), valve_type=ValveType.BALL, tag="V4"))
 
@@ -1854,18 +1858,6 @@ def draw_heating_system(
             equipment=equipment,
             valves=valves,
             instruments=instruments,
-            language=language
-        )
-        png_bytes = service.render_schematic(plan, output_path=output_path)
-        return Image(data=png_bytes, format="png")
-    except Exception as e:
-        raise ValueError(f"draw_heating_system error: {e}") from e
-
-        plan = PipelineSchematic(
-            title=title,
-            pipes=pipes,
-            equipment=equipment,
-            valves=valves,
             language=language
         )
         png_bytes = service.render_schematic(plan, output_path=output_path)
