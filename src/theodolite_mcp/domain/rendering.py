@@ -2483,7 +2483,7 @@ def _draw_openings(ax, wall, p1, p2, dx, dy, length, nx, ny):
 
 def _draw_furniture(ax, items: List[FurnitureItem], m_per_pt: float = 0.1):
     """
-    Renders 2D furniture and sanitary blocks based on type and dimensions.
+    Renders detailed 2D furniture and sanitary blocks with professional styling.
     """
     for item in items:
         w, l = item.width, item.length
@@ -2501,120 +2501,78 @@ def _draw_furniture(ax, items: List[FurnitureItem], m_per_pt: float = 0.1):
             ry = px * math.sin(angle) + py * math.cos(angle)
             return rx + cx, ry + cy
 
-        # Base frame
-        corners = [
-            rot(-w / 2, -l / 2),
-            rot(w / 2, -l / 2),
-            rot(w / 2, l / 2),
-            rot(-w / 2, l / 2),
-            rot(-w / 2, -l / 2),
-        ]
-        ax.plot(
-            *zip(*corners),
-            color=color,
-            lw=D,
-            alpha=0.7 if status == "new" else 0.4,
-            zorder=8,
-        )
-
         t = item.type.lower()
-        if t == "wc":
-            bowl = patches.Circle(
-                rot(0, l * 0.1), w * 0.35, color=color, fill=False, lw=D, zorder=9
-            )
-            ax.add_patch(bowl)
-            tank = [
-                rot(-w * 0.4, -l * 0.4),
-                rot(w * 0.4, -l * 0.4),
-                rot(w * 0.4, -l * 0.1),
-                rot(-w * 0.4, -l * 0.1),
-                rot(-w * 0.4, -l * 0.4),
-            ]
-            ax.plot(*zip(*tank), color=color, lw=D, zorder=9)
-        elif t == "bath":
-            inner = patches.Ellipse(
-                rot(0, 0),
-                w * 0.8,
-                l * 0.8,
-                angle=item.rotation,
-                fill=False,
-                lw=D,
-                color=color,
-                zorder=9,
-            )
-            ax.add_patch(inner)
-        elif t == "bed":
+        
+        # --- High Quality Icons ---
+        if t == "bed":
+            # Outer frame
+            ax.plot(*zip(*[rot(-w/2, -l/2), rot(w/2, -l/2), rot(w/2, l/2), rot(-w/2, l/2), rot(-w/2, -l/2)]), color=color, lw=D, zorder=8)
+            # Pillows with details
             for dx in [-0.25, 0.25]:
-                p = [
-                    rot(w * dx - w * 0.15, l * 0.25),
-                    rot(w * dx + w * 0.15, l * 0.25),
-                    rot(w * dx + w * 0.15, l * 0.4),
-                    rot(w * dx - w * 0.15, l * 0.4),
-                    rot(w * dx - w * 0.15, l * 0.25),
-                ]
-                ax.plot(*zip(*p), color=color, lw=D, zorder=9)
-        elif t == "stove":
-            for dx, dy in [(-0.25, -0.25), (0.25, -0.25), (-0.25, 0.25), (0.25, 0.25)]:
-                b = patches.Circle(
-                    rot(w * dx, l * dy),
-                    w * 0.12,
-                    color=color,
-                    fill=False,
-                    lw=D,
-                    zorder=9,
-                )
-                ax.add_patch(b)
+                p_pts = [rot(w*dx - 0.25, l*0.25), rot(w*dx + 0.25, l*0.25), rot(w*dx + 0.25, l*0.4), rot(w*dx - 0.25, l*0.4), rot(w*dx - 0.25, l*0.25)]
+                ax.plot(*zip(*p_pts), color=color, lw=D/2, zorder=9)
+            # Blanket fold line
+            ax.plot(*zip(*[rot(-w/2, 0), rot(w/2, 0)]), color=color, lw=D/2, linestyle="--", zorder=9)
+
         elif t == "sofa":
-            ax.plot(
-                *zip(*[rot(-w / 2, l * 0.3), rot(w / 2, l * 0.3)]),
-                color=color,
-                lw=D,
-                zorder=9,
-            )
-            ax.plot(
-                *zip(*[rot(-w * 0.4, -l / 2), rot(-w * 0.4, l / 2)]),
-                color=color,
-                lw=D,
-                zorder=9,
-            )
-            ax.plot(
-                *zip(*[rot(w * 0.4, -l / 2), rot(w * 0.4, l / 2)]),
-                color=color,
-                lw=D,
-                zorder=9,
-            )
-        elif t in ["fridge", "washer"]:
-            # Standard appliance cross
-            ax.plot(
-                *zip(*[rot(-w / 2, -l / 2), rot(w / 2, l / 2)]),
-                color=color,
-                lw=D / 2,
-                zorder=9,
-            )
-            ax.plot(
-                *zip(*[rot(w / 2, -l / 2), rot(-w / 2, l / 2)]),
-                color=color,
-                lw=D / 2,
-                zorder=9,
-            )
+            # Main frame
+            ax.plot(*zip(*[rot(-w/2, -l/2), rot(w/2, -l/2), rot(w/2, l/2), rot(-w/2, l/2), rot(-w/2, -l/2)]), color=color, lw=D, zorder=8)
+            # Backrest
+            ax.plot(*zip(*[rot(-w/2, l*0.2), rot(w/2, l*0.2)]), color=color, lw=D, zorder=9)
+            # Armrests
+            ax.plot(*zip(*[rot(-w/2 + 0.15, -l/2), rot(-w/2 + 0.15, l/2)]), color=color, lw=D, zorder=9)
+            ax.plot(*zip(*[rot(w/2 - 0.15, -l/2), rot(w/2 - 0.15, l/2)]), color=color, lw=D, zorder=9)
+
+        elif t == "wc":
+            # Detailed cistern and bowl
+            ax.add_patch(patches.Ellipse(rot(0, l*0.1), w*0.8, l*0.7, angle=item.rotation, color=color, fill=False, lw=D, zorder=9))
+            ax.add_patch(patches.Ellipse(rot(0, l*0.1), w*0.6, l*0.5, angle=item.rotation, color=color, fill=False, lw=D/2, zorder=9))
+            ax.plot(*zip(*[rot(-w*0.45, -l*0.45), rot(w*0.45, -l*0.45), rot(w*0.45, -l*0.15), rot(-w*0.45, -l*0.15), rot(-w*0.45, -l*0.15)]), color=color, lw=D, zorder=9)
+
+        elif t == "bath":
+            # Double line ellipse
+            ax.add_patch(patches.Ellipse(rot(0, 0), w, l, angle=item.rotation, color=color, fill=False, lw=D, zorder=8))
+            ax.add_patch(patches.Ellipse(rot(0, 0), w*0.85, l*0.85, angle=item.rotation, color=color, fill=False, lw=D/2, zorder=9))
+            # Drain
+            ax.add_patch(patches.Circle(rot(0, l*0.35), 0.05, color=color, fill=False, lw=D/2, zorder=10))
+
+        elif t == "sink":
+            ax.add_patch(patches.Rectangle(rot(-w/2, -l/2), w, l, angle=item.rotation, color=color, fill=False, lw=D, zorder=8))
+            ax.add_patch(patches.Ellipse(rot(0, 0), w*0.8, l*0.8, angle=item.rotation, color=color, fill=False, lw=D/2, zorder=9))
+            # Tap
+            ax.plot(*zip(*[rot(0, -l*0.4), rot(0, -l*0.3)]), color=color, lw=D, zorder=10)
+
+        elif t == "stove":
+            # Induction/Gas burners
+            ax.plot(*zip(*[rot(-w/2, -l/2), rot(w/2, -l/2), rot(w/2, l/2), rot(-w/2, l/2), rot(-w/2, -l/2)]), color=color, lw=D, zorder=8)
+            for dx, dy in [(-0.2,-0.2), (0.2,-0.2), (-0.2,0.2), (0.2,0.2)]:
+                ax.add_patch(patches.Circle(rot(w*dx, l*dy), w*0.15, color=color, fill=False, lw=D/2, zorder=9))
+
+        elif t == "fridge":
+            ax.plot(*zip(*[rot(-w/2, -l/2), rot(w/2, -l/2), rot(w/2, l/2), rot(-w/2, l/2), rot(-w/2, -l/2)]), color=color, lw=D, zorder=8)
+            # Handles and cross
+            ax.plot(*zip(*[rot(-w/2, 0), rot(w/2, 0)]), color=color, lw=D/2, zorder=9)
+            ax.plot(*zip(*[rot(w*0.3, -l*0.4), rot(w*0.3, -l*0.1)]), color=color, lw=D, zorder=10)
+            ax.plot(*zip(*[rot(w*0.3, l*0.1), rot(w*0.3, l*0.4)]), color=color, lw=D, zorder=10)
+
+        elif t == "washer":
+            ax.plot(*zip(*[rot(-w/2, -l/2), rot(w/2, -l/2), rot(w/2, l/2), rot(-w/2, l/2), rot(-w/2, -l/2)]), color=color, lw=D, zorder=8)
+            # Porthole
+            ax.add_patch(patches.Circle(rot(0, 0), w*0.35, color=color, fill=False, lw=D, zorder=9))
+            ax.add_patch(patches.Circle(rot(0, 0), w*0.25, color=color, fill=False, lw=D/2, zorder=9))
+            # Controls
+            ax.plot(*zip(*[rot(-w*0.4, l*0.4), rot(w*0.4, l*0.4)]), color=color, lw=D/2, zorder=9)
 
         # Label
         label = getattr(item, "label", None)
         if label:
-            ax.text(
-                cx,
-                cy - l / 2 - 0.2,
-                label,
-                fontproperties=_get_font(6, m_per_pt=m_per_pt),
-                ha="center",
-                va="top",
-                zorder=10,
-            )
+            ax.text(cx, cy - l/2 - 0.2, label, fontproperties=_get_font(6, m_per_pt=m_per_pt),
+                    ha="center", va="top", zorder=10)
 
 
 def _draw_engineering(ax, items: List[EngineeringItem], m_per_pt: float = 0.1):
     """
-    Renders engineering symbols: sockets, switches, lamps, etc.
+    Renders high-quality engineering symbols.
     """
     for item in items:
         x, y = item.point.x, item.point.y
@@ -2627,32 +2585,32 @@ def _draw_engineering(ax, items: List[EngineeringItem], m_per_pt: float = 0.1):
             return rx + x, ry + y
 
         if t == "socket":
-            # Socket symbol: circle with two lines
-            circle = patches.Circle((x, y), 0.12, color="blue", fill=False, lw=D, zorder=11)
-            ax.add_patch(circle)
-            ax.plot(*zip(*[rot(-0.1, 0.1), rot(-0.2, 0.2)]), color="blue", lw=D, zorder=11)
-            ax.plot(*zip(*[rot(0.1, 0.1), rot(0.2, 0.2)]), color="blue", lw=D, zorder=11)
+            # Double line socket symbol
+            ax.add_patch(patches.Circle((x, y), 0.1, color="#1976D2", fill=True, alpha=0.1, zorder=10))
+            ax.add_patch(patches.Circle((x, y), 0.1, color="#1976D2", fill=False, lw=D, zorder=11))
+            ax.plot(*zip(*[rot(-0.07, 0.07), rot(-0.15, 0.15)]), color="#1976D2", lw=D, zorder=11)
+            ax.plot(*zip(*[rot(0.07, 0.07), rot(0.15, 0.15)]), color="#1976D2", lw=D, zorder=11)
         elif t == "switch":
-            # Switch symbol: circle with one L-line
-            circle = patches.Circle((x, y), 0.1, color="orange", fill=False, lw=D, zorder=11)
-            ax.add_patch(circle)
-            ax.plot(*zip(*[rot(0, 0.1), rot(0, 0.2), rot(0.1, 0.2)]), color="orange", lw=D, zorder=11)
+            ax.add_patch(patches.Circle((x, y), 0.08, color="#F57C00", fill=False, lw=D, zorder=11))
+            ax.plot(*zip(*[rot(0, 0.08), rot(0, 0.18), rot(0.1, 0.18)]), color="#F57C00", lw=D, zorder=11)
         elif t == "lamp":
-            # Lamp symbol: cross in circle
-            circle = patches.Circle((x, y), 0.15, color="gold", fill=False, lw=D, zorder=11)
-            ax.add_patch(circle)
-            ax.plot(*zip(*[rot(-0.1, -0.1), rot(0.1, 0.1)]), color="gold", lw=D, zorder=11)
-            ax.plot(*zip(*[rot(-0.1, 0.1), rot(0.1, -0.1)]), color="gold", lw=D, zorder=11)
+            # Realistic chandelier symbol
+            ax.add_patch(patches.Circle((x, y), 0.15, color="#FBC02D", fill=True, alpha=0.2, zorder=10))
+            ax.add_patch(patches.Circle((x, y), 0.15, color="#FBC02D", fill=False, lw=D, zorder=11))
+            for a in [45, 135, 225, 315]:
+                ar = math.radians(a)
+                ax.plot([x, x+math.cos(ar)*0.15], [y, y+math.sin(ar)*0.15], color="#FBC02D", lw=D/2, zorder=11)
         elif t == "radiator":
-            # Radiator: rectangle with zig-zag
-            w, l = 0.8, 0.15
-            rect = [rot(-w/2, -l/2), rot(w/2, -l/2), rot(w/2, l/2), rot(-w/2, l/2), rot(-w/2, -l/2)]
-            ax.plot(*zip(*rect), color="brown", lw=D, zorder=11)
-            for i in range(-3, 4):
-                ax.plot(*zip(*[rot(i*0.1, -l/2), rot(i*0.1, l/2)]), color="brown", lw=D/2, zorder=11)
+            w_r, l_r = 0.8, 0.12
+            rect = [rot(-w_r/2, -l_r/2), rot(w_r/2, -l_r/2), rot(w_r/2, l_r/2), rot(-w_r/2, l_r/2), rot(-w_r/2, -l_r/2)]
+            ax.plot(*zip(*rect), color="#8D6E63", lw=D, zorder=11)
+            # Cooling fins
+            for i in range(-5, 6):
+                ax.plot(*zip(*[rot(i*0.07, -l_r/2), rot(i*0.07, l_r/2)]), color="#8D6E63", lw=D/3, zorder=11)
 
         if item.label:
-            ax.text(x, y + 0.3, item.label, fontproperties=_get_font(5, m_per_pt=m_per_pt), ha="center", zorder=12)
+            ax.text(x, y + 0.25, item.label, fontproperties=_get_font(5, m_per_pt=m_per_pt), 
+                    color="#444444", ha="center", zorder=12)
 
 
 def _draw_chained_dimensions(ax, dimensions: List[DimensionLine], m_per_pt: float = 0.1):
@@ -2808,7 +2766,7 @@ def _draw_ergonomics_warnings(ax, furniture: List[FurnitureItem], walls: List[Wa
 
 def _draw_security(ax, items: List[SecurityItem], m_per_pt: float = 0.1):
     """
-    Renders security systems: cameras with FOV, motion sensors, etc.
+    Renders high-quality security symbols.
     """
     for item in items:
         x, y = item.point.x, item.point.y
@@ -2822,49 +2780,47 @@ def _draw_security(ax, items: List[SecurityItem], m_per_pt: float = 0.1):
             return rx + x, ry + y
 
         if t == "camera":
-            # Camera Body
-            rect = [rot(-0.1, -0.05), rot(0.1, -0.05), rot(0.1, 0.05), rot(-0.1, 0.05), rot(-0.1, -0.05)]
-            ax.plot(*zip(*rect), color="#D32F2F", lw=D, zorder=18)
-            ax.plot(*zip(*[rot(0.1, 0), rot(0.15, 0)]), color="#D32F2F", lw=D, zorder=18)
+            # Realistic CCTV Icon
+            body = [rot(-0.12, -0.06), rot(0.08, -0.06), rot(0.12, 0), rot(0.08, 0.06), rot(-0.12, 0.06), rot(-0.12, -0.06)]
+            ax.fill(*zip(*body), color="white", edgecolor="#C62828", lw=D, zorder=18)
+            ax.plot(*zip(*[rot(0.12, 0), rot(0.18, 0)]), color="#C62828", lw=D, zorder=19) # Lens
             
-            # FOV Cone (Semi-transparent wedge)
+            # FOV Cone with gradient-like alpha
             wedge = patches.Wedge((x, y), item.range, 
                                   math.degrees(angle - fov_half), 
                                   math.degrees(angle + fov_half), 
-                                  color="red", alpha=0.1, zorder=17)
+                                  color="#FF5252", alpha=0.12, zorder=17)
             ax.add_patch(wedge)
             
         elif t == "motion_sensor":
-            # Stylized fan
+            # PIR symbol with detection waves
+            ax.plot(x, y, "h", color="#EF6C00", markersize=4, zorder=18)
             wedge = patches.Wedge((x, y), item.range, 
                                   math.degrees(angle - fov_half), 
                                   math.degrees(angle + fov_half), 
-                                  color="orange", alpha=0.15, zorder=17, hatch="///")
+                                  color="#FFB74D", alpha=0.15, zorder=17, hatch="...")
             ax.add_patch(wedge)
-            ax.plot(x, y, "o", color="orange", markersize=3, zorder=18)
-
-        elif t == "door_sensor":
-            ax.plot(x, y, "s", color="black", markersize=2, zorder=18)
-            ax.text(x, y+0.1, "MS", fontsize=5, ha="center", zorder=19)
 
         elif t == "keypad":
-            # Numeric keypad icon
-            rect = [rot(-0.1, -0.15), rot(0.1, -0.15), rot(0.1, 0.15), rot(-0.1, 0.15), rot(-0.1, -0.15)]
-            ax.plot(*zip(*rect), color="black", lw=D, zorder=18)
-            for i in range(-1, 2):
-                ax.plot(*zip(*[rot(-0.05, i*0.05), rot(0.05, i*0.05)]), color="black", lw=D/2, zorder=18)
+            ax.add_patch(patches.Rectangle(rot(-0.12, -0.18), 0.24, 0.36, angle=item.rotation, 
+                                           facecolor="white", edgecolor="black", lw=D, zorder=18))
+            # Key dots
+            for iy in range(-1, 2):
+                for ix in range(-1, 2):
+                    ax.plot(rot(ix*0.06, iy*0.08)[0], rot(ix*0.06, iy*0.08)[1], ".", color="black", markersize=1, zorder=19)
 
         elif t == "siren":
-            circle = patches.Circle((x, y), 0.15, color="red", fill=True, alpha=0.2, zorder=18)
-            ax.add_patch(circle)
-            for r in [0.2, 0.3]:
-                arc = patches.Arc((x, y), r*2, r*2, theta1=0, theta2=360, color="red", lw=D/2, linestyle=":", zorder=18)
+            ax.add_patch(patches.Circle((x, y), 0.15, color="#D32F2F", fill=True, alpha=0.2, zorder=18))
+            ax.add_patch(patches.Circle((x, y), 0.15, color="#D32F2F", fill=False, lw=D, zorder=19))
+            # Sound waves
+            for r in [0.22, 0.32, 0.42]:
+                arc = patches.Arc((x, y), r*2, r*2, theta1=0, theta2=360, color="#D32F2F", lw=D/2, linestyle=(0, (3, 5)), zorder=18)
                 ax.add_patch(arc)
 
         if item.label:
-            ax.text(x, y - 0.3, item.label, fontproperties=_get_font(5, m_per_pt=m_per_pt), 
-                    color="darkred", ha="center", zorder=20, 
-                    bbox=dict(facecolor="white", edgecolor="none", alpha=0.7, pad=0))
+            ax.text(x, y - 0.4, item.label, fontproperties=_get_font(5, m_per_pt=m_per_pt), 
+                    color="#B71C1C", ha="center", weight="bold", zorder=20, 
+                    bbox=dict(facecolor="white", edgecolor="none", alpha=0.8, pad=0.1))
 
 
 def render_interior_plan(plan: InteriorPlan, output_format: str = "png") -> bytes:
