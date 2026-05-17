@@ -280,18 +280,20 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
     instr = len(plan.instruments) > 0
     items = []
     for m in media: items.append(("pipe", m, MEDIA_STYLES.get(m, MEDIA_STYLES[PipeMedium.CUSTOM]).get(f"label_{lang}", m), MEDIA_STYLES.get(m)))
-    if media: items.append(("note", "DN", "DN - Номінальний діаметр (мм)" if lang == "uk" else "DN - Nominal Diameter (mm)", None))
+    if media: 
+        lbl = "DN - Номінальний діаметр (мм)" if lang == "uk" else ("DN - Номинальный диаметр (мм)" if lang == "ru" else "DN - Nominal Diameter (mm)")
+        items.append(("note", "DN", lbl, None))
     # Tag prefixes explanation
     prefix_map = {
-        "V": ("V - Кран / Вентиль" if lang == "uk" else "V - Valve"),
-        "CV": ("CV - Зворотний клапан" if lang == "uk" else "CV - Check Valve"),
-        "F": ("F - Фільтр" if lang == "uk" else "F - Filter"),
-        "B": ("B - Бойлер / Котел" if lang == "uk" else "B - Boiler"),
-        "GA": ("GA - Гідроакумулятор" if lang == "uk" else "GA - Expansion Vessel"),
-        "P": ("P - Насос" if lang == "uk" else "P - Pump"),
-        "T": ("T - Резервуар" if lang == "uk" else "T - Tank"),
-        "PI": ("PI - Манометр (Індикатор)" if lang == "uk" else "PI - Pressure Indicator"),
-        "PC": ("PC - Реле тиску (Контролер)" if lang == "uk" else "PC - Pressure Controller"),
+        "V": {"uk": "V - Кран / Вентиль", "ru": "V - Кран / Вентиль", "en": "V - Valve"},
+        "CV": {"uk": "CV - Зворотний клапан", "ru": "CV - Обратный клапан", "en": "CV - Check Valve"},
+        "F": {"uk": "F - Фільтр", "ru": "F - Фильтр", "en": "F - Filter"},
+        "B": {"uk": "B - Бойлер / Котел", "ru": "B - Бойлер / Котел", "en": "B - Boiler"},
+        "GA": {"uk": "GA - Гідроакумулятор", "ru": "GA - Гидроаккумулятор", "en": "GA - Expansion Vessel"},
+        "P": {"uk": "P - Насос", "ru": "P - Насос", "en": "P - Pump"},
+        "T": {"uk": "T - Резервуар", "ru": "T - Резервуар", "en": "T - Tank"},
+        "PI": {"uk": "PI - Манометр (Індикатор)", "ru": "PI - Манометр", "en": "PI - Pressure Indicator"},
+        "PC": {"uk": "PC - Реле тиску (Контролер)", "ru": "PC - Реле давления", "en": "PC - Pressure Controller"},
     }
     prefixes_used = set()
     for v in plan.valves:
@@ -304,9 +306,15 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
     
     for pfx in sorted(list(prefixes_used)):
         if pfx in prefix_map and not any(k == pfx for t, k, l, s in items):
-            items.append(("note", pfx, prefix_map[pfx], None))
+            lbl = prefix_map[pfx].get(lang, prefix_map[pfx]["en"])
+            items.append(("note", pfx, lbl, None))
 
-    var_map = {"P": ("P - Тиск" if lang == "uk" else "P - Pressure"), "T": ("T - Температура" if lang == "uk" else "T - Temperature"), "F": ("F - Витрата" if lang == "uk" else "F - Flow"), "Q": ("Q - Енергія/Тепло" if lang == "uk" else "Q - Energy/Heat")}
+    var_map = {
+        "P": {"uk": "P - Тиск", "ru": "P - Давление", "en": "P - Pressure"},
+        "T": {"uk": "T - Температура", "ru": "T - Температура", "en": "T - Temperature"},
+        "F": {"uk": "F - Витрата", "ru": "F - Расход", "en": "F - Flow"},
+        "Q": {"uk": "Q - Енергія/Тепло", "ru": "Q - Энергия/Тепло", "en": "Q - Energy/Heat"}
+    }
     vars_used = set()
 
     for i in plan.instruments: vars_used.add(i.measured_variable)
@@ -316,20 +324,30 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
         if e.equipment_type == EquipmentType.FLOW_METER: vars_used.add("F")
         if e.equipment_type == EquipmentType.HEAT_METER: vars_used.add("Q")
     for v in sorted(list(vars_used)):
-        if v in var_map: items.append(("note", v, var_map[v], None))
+        if v in var_map: 
+            lbl = var_map[v].get(lang, var_map[v]["en"])
+            items.append(("note", v, lbl, None))
+    uk_v = {"check": "Зворотний клапан", "ball": "Кран кульовий", "gate": "Засувка", "butterfly": "Затвор", "globe": "Вентиль", "3way_mixing": "Кран 3-хід.", "prv": "Редуктор тиску", "safety": "Запобіжний клапан"}
+    ru_v = {"check": "Обратный клапан", "ball": "Кран шаровый", "gate": "Задвижка", "butterfly": "Затвор", "globe": "Вентиль", "3way_mixing": "Кран 3-ход.", "prv": "Редуктор давления", "safety": "Предохранительный клапан"}
+    
     for v in valves:
         label = v.replace("_", " ").title()
-        if lang == "uk":
-            uk_v = {"check": "Зворотний клапан", "ball": "Кран кульовий", "gate": "Засувка", "butterfly": "Затвор", "globe": "Вентиль", "3way_mixing": "Кран 3-хід.", "prv": "Редуктор тиску", "safety": "Запобіжний клапан"}
-            label = uk_v.get(v, label)
+        if lang == "uk": label = uk_v.get(v, label)
+        elif lang == "ru": label = ru_v.get(v, label)
         items.append(("valve", v, label, None))
+
+    uk_e = {"boiler": "Бойлер/Котел", "centrifugal_pump": "Насос", "circulation_pump": "Циркуляційний насос", "expansion_vessel": "Гідроакумулятор", "mesh_filter": "Фільтр", "storage_tank": "Резервуар", "pressure_gauge": "Манометр", "thermometer": "Термометр", "flow_meter": "Витратомір", "heat_meter": "Теплолічильник", "radiator": "Радіатор", "manifold": "Колектор"}
+    ru_e = {"boiler": "Бойлер/Котел", "centrifugal_pump": "Насос", "circulation_pump": "Циркуляционный насос", "expansion_vessel": "Гидроаккумулятор", "mesh_filter": "Фильтр", "storage_tank": "Резервуар", "pressure_gauge": "Манометр", "thermometer": "Термометр", "flow_meter": "Расходомер", "heat_meter": "Теплосчетчик", "radiator": "Радиатор", "manifold": "Коллектор"}
+    
     for e in equip:
         label = e.replace("_", " ").title()
-        if lang == "uk":
-            uk_e = {"boiler": "Бойлер/Котел", "centrifugal_pump": "Насос", "expansion_vessel": "Гідроакумулятор", "mesh_filter": "Фільтр", "storage_tank": "Резервуар", "pressure_gauge": "Манометр", "thermometer": "Термометр", "flow_meter": "Витратомір", "heat_meter": "Теплолічильник"}
-            label = uk_e.get(e, label)
+        if lang == "uk": label = uk_e.get(e, label)
+        elif lang == "ru": label = ru_e.get(e, label)
         items.append(("equipment", e, label, None))
-    if instr: items.append(("instrument", "iso3511", "КВПіА" if lang == "uk" else "P&ID", None))
+        
+    if instr: 
+        lbl = "КВПіА" if lang == "uk" else ("КИПиА" if lang == "ru" else "P&ID")
+        items.append(("instrument", "iso3511", lbl, None))
     if not items: return
     row_h, legend_w = 9.0, 95.0
     legend_h = (len(items) + 1.5) * row_h
@@ -337,7 +355,9 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
     ax_leg = fig.add_axes([lx/pw_mm, ly/ph_mm, legend_w/pw_mm, legend_h/ph_mm])
     ax_leg.set_xlim(0, legend_w); ax_leg.set_ylim(0, legend_h); ax_leg.axis("off")
     ax_leg.add_patch(Rectangle((0, 0), legend_w, legend_h, fc="white", ec="black", lw=D_WIDE, alpha=0.9, zorder=9))
-    title = "УМОВНІ ПОЗНАЧЕННЯ" if lang == "uk" else "SYMBOL LEGEND"
+    
+    title_map = {"uk": "УМОВНІ ПОЗНАЧЕННЯ", "ru": "УСЛОВНЫЕ ОБОЗНАЧЕНИЯ", "en": "SYMBOL LEGEND"}
+    title = title_map.get(lang, title_map["en"])
     ax_leg.text(legend_w/2, legend_h - row_h*0.7, title, fontproperties=_get_font(9, bold=True, lang=lang), ha="center", va="center", zorder=10)
     leg_m_per_pt = 1.0 / MM_TO_PT 
     for i, (itype, key, label, style) in enumerate(items):

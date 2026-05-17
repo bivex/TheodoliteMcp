@@ -1746,6 +1746,14 @@ def draw_heating_system(
             EquipmentType, ValveType, PipeMedium
         )
         
+        # Localized labels
+        labels = {
+            "en": {"pump": "Heating Pump", "s_manifold": "Supply Manifold", "r_manifold": "Return Manifold"},
+            "uk": {"pump": "Циркуляційний насос", "s_manifold": "Подаючий колектор", "r_manifold": "Зворотній колектор"},
+            "ru": {"pump": "Циркуляционный насос", "s_manifold": "Подающий коллектор", "r_manifold": "Обратный коллектор"},
+        }
+        l = labels.get(language, labels["en"])
+        
         pipes, equipment, valves = [], [], []
         
         # 1. Boiler at the left
@@ -1767,7 +1775,7 @@ def draw_heating_system(
             center_pt=Point(x=6, y=11),
             equipment_type=EquipmentType.CIRCULATION_PUMP,
             tag="P1",
-            label="Heating Pump",
+            label=l["pump"],
             width=0.8,
             height=0.8
         ))
@@ -1778,7 +1786,7 @@ def draw_heating_system(
             center_pt=Point(x=12, y=11),
             equipment_type=EquipmentType.MANIFOLD,
             tag="M1",
-            label="Supply Manifold",
+            label=l["s_manifold"],
             width=4.0,
             height=0.6
         ))
@@ -1788,7 +1796,7 @@ def draw_heating_system(
             center_pt=Point(x=12, y=5),
             equipment_type=EquipmentType.MANIFOLD,
             tag="M2",
-            label="Return Manifold",
+            label=l["r_manifold"],
             width=4.0,
             height=0.6
         ))
