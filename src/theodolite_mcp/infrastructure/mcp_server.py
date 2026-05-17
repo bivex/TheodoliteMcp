@@ -344,6 +344,13 @@ def draw_plot_plan(
             description="List of zone definitions with name, points, and styling",
         ),
     ] = None,
+    security_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of security items (camera, motion_sensor, keypad, siren)",
+        ),
+    ] = None,
     language: Annotated[
         str,
         Field(
@@ -419,10 +426,12 @@ def draw_plot_plan(
                     fill_alpha=z.get("fill_alpha", 0.3),
                 )
             )
+        security = [SecurityItem(**s) for s in security_json] if security_json else []
         plan = PlotPlan(
             title=title,
             boundary_points=boundary_points,
             zones=zones,
+            security=security,
             language=language,
             standard=standard,
             show_vertex_labels=show_vertex_labels,
@@ -1312,6 +1321,13 @@ def draw_plot_plan_svg(
             description="List of zone definitions with name, points, and styling",
         ),
     ] = None,
+    security_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of security items (camera, motion_sensor, keypad, siren)",
+        ),
+    ] = None,
     language: Annotated[
         str,
         Field(
@@ -1385,10 +1401,12 @@ def draw_plot_plan_svg(
                     fill_alpha=z.get("fill_alpha", 0.3),
                 )
             )
+        security = [SecurityItem(**s) for s in security_json] if security_json else []
         plan = PlotPlan(
             title=title,
             boundary_points=boundary_points,
             zones=zones,
+            security=security,
             language=language,
             standard=standard,
             show_vertex_labels=show_vertex_labels,

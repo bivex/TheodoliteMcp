@@ -2,6 +2,7 @@ from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
 from .base import Point
+from .interior import SecurityItem
 
 
 class AsBuiltPoint(BaseModel):
@@ -45,6 +46,7 @@ class PlotPlan(BaseModel):
     date: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
     boundary_points: List[Point]
     zones: List[Zone] = []
+    security: List[SecurityItem] = []
     language: str = "ru"  # "ru", "uk", "en"
     standard: str = (
         "construction"  # "construction" (ISO 128-23) or "shipbuilding" (ISO 129-4)

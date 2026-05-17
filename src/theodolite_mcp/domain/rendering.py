@@ -3133,6 +3133,10 @@ def render_plot_plan(plan: PlotPlan, output_format: str = "png") -> bytes:
             m_per_pt=m_per_pt,
             tracker=label_tracker,
         )
+
+    if getattr(plan, "security", None):
+        _draw_security(ax, plan.security, m_per_pt=m_per_pt)
+
     _draw_boundary(ax, plan.boundary_points, standard=plan.standard)
 
     if plan.show_vertex_labels:
