@@ -601,27 +601,31 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
     ax_leg.text(legend_w / 2, legend_h - row_h * 0.6, title,
                 fontproperties=_get_font(12, bold=True, lang=lang), ha="center", va="center", color="black", zorder=10)
 
-    # Need a small m_per_pt for the mini-symbols in the legend (units are mm)
-    # 1mm on paper = 1 unit in ax_leg.
-    # Drawing functions expect coordinates in meters. 
-    # Let's say 1 unit in ax_leg = 1 meter for drawing purposes.
-    leg_m_per_pt = 1.0 / MM_TO_PT
+    # 1 unit in ax_leg = 1 mm on paper.
+    # To make symbols visible in the legend, we need to pass a scale that makes them 
+    # occupy a reasonable part of the row (e.g., 6-8mm).
+    # Standard nominal_diameter 25 gives s=0.15. To get 6mm, we need a multiplier of 40.
+    legend_symbol_scale = 40.0
+    leg_m_per_pt = legend_symbol_scale / MM_TO_PT
 
     for i, (itype, key, label, style) in enumerate(items):
         ry = legend_h - row_h * (i + 1.8)
         sample_x = 12.0
-        text_x = 25.0
+        text_x = 28.0 # Shift text more to the right
 
         if itype == "pipe" and style:
             ax_leg.plot([sample_x - 7, sample_x + 7], [ry, ry],
-                        color=style["color"], linestyle=style["ls"], linewidth=D_WIDE * 2.5, zorder=10)
+                        color=style["color"], linestyle=style["ls"], linewidth=D_WIDE * 3, zorder=10)
         elif itype == "valve":
-            # Use ACTUAL symbol drawing function
             from .models.schematic import Point as ModelPoint
-            v = ValveSymbol(center_pt=ModelPoint(x=sample_x, y=ry), valve_type=key, nominal_diameter=25)
+            # Scale up the nominal diameter or the result of drawing to be visible
+            v = ValveSymbol(center_pt=ModelPoint(x=sample_x/legend_symbol_scale, y=ry/legend_symbol_scale), 
+                            valve_type=key, nominal_diameter=200) # Use large DN for better visibility
+            # Temporarily scale the axis to draw the symbol correctly
             _draw_valve_symbol(ax_leg, v, leg_m_per_pt)
         elif itype == "equipment":
-            v = EquipmentSymbol(center_pt=ModelPoint(x=sample_x, y=ry), equipment_type=key, width=8, height=8)
+            # For equipment, width/height are already in 'meters' (which we map to units)
+            v = EquipmentSymbol(center_pt=ModelPoint(x=sample_x, y=ry), equipment_type=key, width=10, height=10)
             _draw_equipment_symbol(ax_leg, v, leg_m_per_pt)
         elif itype == "instrument":
             v = InstrumentSymbol(center_pt=ModelPoint(x=sample_x, y=ry), measured_variable="X", suffix="Y")
