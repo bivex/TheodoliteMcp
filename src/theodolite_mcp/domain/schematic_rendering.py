@@ -331,6 +331,7 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
         "Q": {"uk": "Q - Енергія/Тепло", "ru": "Q - Энергия/Тепло", "en": "Q - Energy/Heat"},
         "A": {"uk": "A - Аналіз (CO та інше)", "ru": "A - Анализ (CO и др.)", "en": "A - Analysis (CO etc.)"},
         "S": {"uk": "S - Дим", "ru": "S - Дым", "en": "S - Smoke"},
+        "L": {"uk": "L - Рівень", "ru": "L - Уровень", "en": "L - Level"},
     }
     vars_used = set()
 
@@ -341,7 +342,9 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
         if e.equipment_type == EquipmentType.FLOW_METER: vars_used.add("F")
         if e.equipment_type == EquipmentType.HEAT_METER: vars_used.add("Q")
     for v in sorted(list(vars_used)):
-        if v in var_map: 
+        # Skip var_map entries already covered by prefix_map (A→AA, S→SA)
+        already = any(v == pfx[:1] and len(pfx) > 1 and pfx in prefix_map and any(k == pfx for t, k, l, s in items) for pfx in prefix_map)
+        if v in var_map and not already:
             lbl = var_map[v].get(lang, var_map[v]["en"])
             items.append(("note", v, lbl, None))
     uk_v = {"check": "Зворотний клапан", "ball": "Кран кульовий", "gate": "Засувка", "butterfly": "Затвор", "globe": "Вентиль", "3way_mixing": "Кран 3-хід.", "prv": "Редуктор тиску", "safety": "Запобіжний клапан"}
