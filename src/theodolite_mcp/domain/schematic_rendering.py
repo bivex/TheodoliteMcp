@@ -538,79 +538,99 @@ def _draw_pipe_support(ax, support: PipeSupport, m_per_pt: float):
         ax.plot(*zip(*pts), color="black", lw=lw, zorder=6)
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # Legend
 # ---------------------------------------------------------------------------
-def _draw_symbol_legend(ax, plan: PipelineSchematic, m_per_pt: float):
-    """Draw symbol legend in upper-right area of the schematic."""
+def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_mm: float):
+    """Draw symbol legend in absolute paper coordinates (top-right)."""
     lang = plan.language
-    media_used = set(p.medium for p in plan.pipes)
-    valve_types_used = set(v.valve_type for v in plan.valves)
-    eq_types_used = set(e.equipment_type for e in plan.equipment)
+    media_used = sorted(list(set(p.medium for p in plan.pipes)))
+    valve_types_used = sorted(list(set(v.valve_type for v in plan.valves)))
+    eq_types_used = sorted(list(set(e.equipment_type for e in plan.equipment)))
     instr_used = len(plan.instruments) > 0
 
-    if not media_used and not valve_types_used and not eq_types_used and not instr_used:
-        return
+    logger.info(f"Generating legend: media={media_used}, valves={valve_types_used}, equipment={eq_types_used}, instruments={instr_used}")
 
     items = []
-
     for medium in media_used:
         style = MEDIA_STYLES.get(medium, MEDIA_STYLES[PipeMedium.CUSTOM])
         label = style.get(f"label_{lang}", style["label_en"])
         items.append(("pipe", medium, label, style))
 
-    for vt in sorted(valve_types_used):
-        items.append(("valve", vt, vt.replace("_", " ").title(), None))
+    for vt in valve_types_used:
+        label = vt.replace("_", " ").title()
+        if lang == "ru":
+            ru_map = {"check": "Клапан обр.", "ball": "Кран шар.", "gate": "Задвижка", "butterfly": "Затвор", "globe": "Вентиль"}
+            label = ru_map.get(vt, label)
+        items.append(("valve", vt, label, None))
 
-    for et in sorted(eq_types_used):
-        items.append(("equipment", et, et.replace("_", " ").title(), None))
+    for et in eq_types_used:
+        label = et.replace("_", " ").title()
+        if lang == "ru":
+            ru_map = {"boiler": "Котел", "centrifugal_pump": "Насос", "expansion_vessel": "Бак", "mesh_filter": "Фильтр", "storage_tank": "Резервуар"}
+            label = ru_map.get(et, label)
+        items.append(("equipment", et, label, None))
 
     if instr_used:
-        items.append(("instrument", "iso3511", "P&ID (ISO 3511)", None))
+        items.append(("instrument", "iso3511", "КИПиА" if lang == "ru" else "P&ID", None))
 
-    n_items = len(items)
-    if n_items == 0:
+    if not items:
+        logger.warning("Legend requested but no items found to display.")
         return
 
-    row_h = 0.25  # Was 0.12
-    legend_w = 2.5  # Was 1.2
-    legend_h = n_items * row_h + row_h * 1.5
+    # Dimensions in mm
+    row_h = 12.0
+    legend_w = 90.0
+    legend_h = (len(items) + 1.2) * row_h
+    
+    lx_mm = pw_mm - MARGIN_OTHER - legend_w - 5
+    ly_mm = ph_mm - MARGIN_OTHER - legend_h - 5
+    
+    ax_leg = fig.add_axes([lx_mm / pw_mm, ly_mm / ph_mm, legend_w / pw_mm, legend_h / pw_mm])
+    ax_leg.set_xlim(0, legend_w)
+    ax_leg.set_ylim(0, legend_h)
+    ax_leg.axis("off")
 
-    xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
-    # Anchor to top-right with margin
-    lx = xlim[1] - legend_w - 0.2
-    ly = ylim[1] - 0.2
+    ax_leg.add_patch(Rectangle((0, 0), legend_w, legend_h, fc="white", ec="black", lw=D_WIDE, alpha=0.9, zorder=9))
 
-    # Background
-    rect = Rectangle((lx, ly - legend_h), legend_w, legend_h,
-                      fc="white", ec="black", lw=D_WIDE, alpha=0.9, zorder=9)
-    ax.add_patch(rect)
-
-    # Title
     title = "УСЛОВНЫЕ ОБОЗНАЧЕНИЯ" if lang == "ru" else "SYMBOL LEGEND"
-    ax.text(lx + legend_w / 2, ly - row_h * 0.7, title,
-            fontproperties=_get_font(12, bold=True, m_per_pt=m_per_pt),
-            ha="center", va="center", color="black", zorder=10)
+    ax_leg.text(legend_w / 2, legend_h - row_h * 0.6, title,
+                fontproperties=_get_font(12, bold=True, lang=lang), ha="center", va="center", color="black", zorder=10)
+
+    # Need a small m_per_pt for the mini-symbols in the legend (units are mm)
+    # 1mm on paper = 1 unit in ax_leg.
+    # Drawing functions expect coordinates in meters. 
+    # Let's say 1 unit in ax_leg = 1 meter for drawing purposes.
+    leg_m_per_pt = 1.0 / MM_TO_PT
 
     for i, (itype, key, label, style) in enumerate(items):
-        ry = ly - row_h * (i + 2.0)
-        sample_x = lx + 0.3
-        text_x = lx + 0.7
+        ry = legend_h - row_h * (i + 1.8)
+        sample_x = 12.0
+        text_x = 25.0
 
         if itype == "pipe" and style:
-            ax.plot([sample_x - 0.15, sample_x + 0.15], [ry, ry],
-                    color=style["color"], linestyle=style["ls"],
-                    linewidth=D_WIDE * 1.5, zorder=10)
-        elif itype in ("valve", "equipment", "instrument"):
-            # Larger sample symbol
-            ax.plot([sample_x - 0.12, sample_x + 0.12], [ry, ry],
-                    color="black", linewidth=D_SYMBOL * 1.5, zorder=10)
-            ax.plot(sample_x, ry, "s", color="black", markersize=4, zorder=10)
+            ax_leg.plot([sample_x - 7, sample_x + 7], [ry, ry],
+                        color=style["color"], linestyle=style["ls"], linewidth=D_WIDE * 2.5, zorder=10)
+        elif itype == "valve":
+            # Use ACTUAL symbol drawing function
+            from .models.schematic import Point as ModelPoint
+            v = ValveSymbol(center_pt=ModelPoint(x=sample_x, y=ry), valve_type=key, nominal_diameter=25)
+            _draw_valve_symbol(ax_leg, v, leg_m_per_pt)
+        elif itype == "equipment":
+            v = EquipmentSymbol(center_pt=ModelPoint(x=sample_x, y=ry), equipment_type=key, width=8, height=8)
+            _draw_equipment_symbol(ax_leg, v, leg_m_per_pt)
+        elif itype == "instrument":
+            v = InstrumentSymbol(center_pt=ModelPoint(x=sample_x, y=ry), measured_variable="X", suffix="Y")
+            _draw_instrument_bubble(ax_leg, v, leg_m_per_pt)
 
-        ax.text(text_x, ry, label,
-                fontproperties=_get_font(10, m_per_pt=m_per_pt),
-                ha="left", va="center", color="black", zorder=10)
+        ax_leg.text(text_x, ry, label, fontproperties=_get_font(10, lang=lang),
+                    ha="left", va="center", color="black", zorder=10)
+    
+    logger.info(f"Legend drawn with {len(items)} items.")
 
 
 # ---------------------------------------------------------------------------
@@ -726,7 +746,7 @@ def render_pipeline_schematic(plan: PipelineSchematic, output_format: str = "png
 
     # Legend
     if plan.show_legend:
-        _draw_symbol_legend(ax, plan, m_per_pt)
+        _draw_symbol_legend(fig, plan, pw_mm, ph_mm)
 
     # Stamp (title block)
     scale_str = f"1:{plan.scale}"
