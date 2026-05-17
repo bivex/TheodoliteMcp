@@ -314,23 +314,23 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
         items.append(("equipment", e, label, None))
     if instr: items.append(("instrument", "iso3511", "КВПіА" if lang == "uk" else "P&ID", None))
     if not items: return
-    row_h, legend_w = 12.0, 120.0
-    legend_h = (len(items) + 1.2) * row_h
+    row_h, legend_w = 9.0, 95.0
+    legend_h = (len(items) + 1.5) * row_h
     lx, ly = pw_mm - MARGIN_OTHER - legend_w - 5, ph_mm - MARGIN_OTHER - legend_h - 5
     ax_leg = fig.add_axes([lx/pw_mm, ly/ph_mm, legend_w/pw_mm, legend_h/ph_mm])
     ax_leg.set_xlim(0, legend_w); ax_leg.set_ylim(0, legend_h); ax_leg.axis("off")
     ax_leg.add_patch(Rectangle((0, 0), legend_w, legend_h, fc="white", ec="black", lw=D_WIDE, alpha=0.9, zorder=9))
     title = "УМОВНІ ПОЗНАЧЕННЯ" if lang == "uk" else "SYMBOL LEGEND"
-    ax_leg.text(legend_w/2, legend_h - row_h*0.6, title, fontproperties=_get_font(10, bold=True, lang=lang), ha="center", va="center", zorder=10)
+    ax_leg.text(legend_w/2, legend_h - row_h*0.7, title, fontproperties=_get_font(9, bold=True, lang=lang), ha="center", va="center", zorder=10)
     leg_m_per_pt = 1.0 / MM_TO_PT 
     for i, (itype, key, label, style) in enumerate(items):
-        ry, sx, tx = legend_h - row_h*(i + 1.8), 12.0, 32.0
-        if itype == "pipe" and style: ax_leg.plot([sx-7, sx+7], [ry, ry], color=style["color"], linewidth=D_EXTRA_WIDE*2, zorder=10)
-        elif itype == "note": ax_leg.text(sx, ry, key, fontproperties=_get_font(10, bold=True, lang=lang), ha="center", va="center", zorder=10)
-        elif itype == "valve": _draw_valve_symbol(ax_leg, ValveSymbol(center_pt=ModelPoint(x=sx, y=ry), valve_type=key, nominal_diameter=5000), leg_m_per_pt)
-        elif itype == "equipment": _draw_equipment_symbol(ax_leg, EquipmentSymbol(center_pt=ModelPoint(x=sx, y=ry), equipment_type=key, width=12, height=12), leg_m_per_pt)
+        ry, sx, tx = legend_h - row_h*(i + 1.8), 10.0, 26.0
+        if itype == "pipe" and style: ax_leg.plot([sx-6, sx+6], [ry, ry], color=style["color"], linewidth=D_EXTRA_WIDE*1.5, zorder=10)
+        elif itype == "note": ax_leg.text(sx, ry, key, fontproperties=_get_font(8, bold=True, lang=lang), ha="center", va="center", zorder=10)
+        elif itype == "valve": _draw_valve_symbol(ax_leg, ValveSymbol(center_pt=ModelPoint(x=sx, y=ry), valve_type=key, nominal_diameter=4000), leg_m_per_pt)
+        elif itype == "equipment": _draw_equipment_symbol(ax_leg, EquipmentSymbol(center_pt=ModelPoint(x=sx, y=ry), equipment_type=key, width=9, height=9), leg_m_per_pt)
         elif itype == "instrument": _draw_instrument_bubble(ax_leg, InstrumentSymbol(center_pt=ModelPoint(x=sx, y=ry), measured_variable="X", suffix="Y"), leg_m_per_pt)
-        ax_leg.text(tx, ry, label, fontproperties=_get_font(10, lang=lang), ha="left", va="center", zorder=10)
+        ax_leg.text(tx, ry, label, fontproperties=_get_font(9, lang=lang), ha="left", va="center", zorder=10)
 
 def render_pipeline_schematic(plan: PipelineSchematic, output_format: str = "png") -> bytes:
     pw_mm, ph_mm = PAPER_SIZES.get(plan.paper_format, PAPER_SIZES["A3"])
