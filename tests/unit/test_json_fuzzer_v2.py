@@ -555,7 +555,7 @@ class TestRenderingFuzzing:
 
     @given(
         points=st.lists(
-            st.finite_dictionaries(
+            st.fixed_dictionaries(
                 {
                     "station": finite_float,
                     "elevation": finite_float,
@@ -586,10 +586,10 @@ class TestRenderingFuzzing:
         walls=st.lists(
             st.fixed_dictionaries(
                 {
-                    "start_pt": st.finite_dictionaries(
+                    "start_pt": st.fixed_dictionaries(
                         {"x": finite_float, "y": finite_float}
                     ),
-                    "end_pt": st.finite_dictionaries(
+                    "end_pt": st.fixed_dictionaries(
                         {"x": finite_float, "y": finite_float}
                     ),
                     "thickness": st.floats(
@@ -597,7 +597,7 @@ class TestRenderingFuzzing:
                     ),
                     "openings": st.lists(
                         st.none()
-                        | st.finite_dictionaries(
+                        | st.fixed_dictionaries(
                             {"x": finite_float, "y": finite_float}
                         ),
                         max_size=5,
@@ -611,7 +611,7 @@ class TestRenderingFuzzing:
                 {
                     "name": st.text(max_size=30),
                     "points": st.lists(
-                        st.finite_dictionaries({"x": finite_float, "y": finite_float}),
+                        st.fixed_dictionaries({"x": finite_float, "y": finite_float}),
                         max_size=10,
                     ),
                 }
