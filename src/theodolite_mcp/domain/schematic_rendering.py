@@ -131,6 +131,8 @@ def _draw_pipe_segment(ax, pipe: PipeSegment, m_per_pt: float, tracker: Optional
 
 def _draw_valve_symbol(ax, valve: ValveSymbol, m_per_pt: float, tracker: Optional[LabelTracker] = None):
     cx, cy, s, ang, lw, vt = valve.center_pt.x, valve.center_pt.y, max(0.25, (valve.nominal_diameter or 25) / 1000.0 * 1.2), valve.rotation, D_SYMBOL, valve.valve_type
+    if valve.nominal_diameter and valve.nominal_diameter >= 4000: lw = D_SYMBOL * 2.5
+    
     if vt == ValveType.GATE:
         for p in [([-s, -s*0.7], [0, 0], [-s, s*0.7]), ([s, -s*0.7], [0, 0], [s, s*0.7])]:
             ax.plot(*zip(*_rot_points(p, cx, cy, ang)), color="black", lw=lw, zorder=6)
@@ -175,6 +177,7 @@ def _draw_valve_symbol(ax, valve: ValveSymbol, m_per_pt: float, tracker: Optiona
 
 def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float, tracker: Optional[LabelTracker] = None):
     cx, cy, w, h, ang, lw, et = eq.center_pt.x, eq.center_pt.y, eq.width, eq.height, eq.rotation, D_SYMBOL, eq.equipment_type
+    if w >= 8: lw = D_SYMBOL * 2.5
     hw, hh = w / 2, h / 2
     if et in (EquipmentType.CENTRIFUGAL_PUMP, EquipmentType.CIRCULATION_PUMP):
         r = min(w, h) / 2
@@ -315,10 +318,14 @@ def render_pipeline_schematic(plan: PipelineSchematic, output_format: str = "png
     xs, ys = [p[0] for p in (pts or [(0,0)])], [p[1] for p in (pts or [(1,1)])]
     min_x, max_x, min_y, max_y = min(xs), max(xs), min(ys), max(ys)
     data_w, data_h = max(max_x - min_x, 0.1), max(max_y - min_y, 0.1)
-    # Use full width for calculating scale (stamp covers part of it, but that's fine for pipeline diagrams)
-    draw_w_mm, draw_h_mm = pw_mm - MARGIN_LEFT - MARGIN_OTHER, ph_mm - MARGIN_OTHER * 2
-    m_per_mm = max(data_w / (draw_w_mm * 0.9), data_h / (draw_h_mm * 0.9))
+    
+    # Safe drawing area avoids the legend (125mm on right)
+    draw_w_mm, draw_h_mm = pw_mm - MARGIN_LEFT - 125.0, ph_mm - MARGIN_OTHER * 2
+    
+    # Use 30% padding to ensure labels don't spill out
+    m_per_mm = max(data_w / draw_w_mm, data_h / draw_h_mm) * 1.3
     m_per_pt = m_per_mm / MM_TO_PT
+    
     ax = fig.add_axes([MARGIN_LEFT/pw_mm, MARGIN_OTHER/ph_mm, draw_w_mm/pw_mm, draw_h_mm/ph_mm])
     cx_data, cy_data = (min_x + max_x) / 2, (min_y + max_y) / 2
     half_w_paper, half_h_paper = (draw_w_mm * m_per_mm) / 2, (draw_h_mm * m_per_mm) / 2
