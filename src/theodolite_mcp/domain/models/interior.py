@@ -5,11 +5,13 @@ from .base import Point
 
 
 class Opening(BaseModel):
-    type: str  # "door", "window"
+    type: str  # "door", "window", "arch"
     start_distance: float = Field(..., alias="position")
     width: float
     height: Optional[float] = 2.1
     direction: int = 1  # 1 or -1 for door opening side
+    swing_angle: float = 90.0  # Opening arc angle
+    status: str = "existing"  # "existing", "demolish", "new"
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -28,14 +30,33 @@ class Room(BaseModel):
     number: str
     points: List[Point]
     floor_material: str = "concrete"
+    wall_finish: Optional[str] = None
+    ceiling_height: float = 2.7
+    tags: List[str] = []
 
 
 class FurnitureItem(BaseModel):
-    type: str  # "bed", "sofa", "table", "chair", "wc", "bath", "sink", "stove"
+    type: str  # "bed", "sofa", "table", "chair", "wc", "bath", "sink", "stove", "fridge", "washer"
     center_pt: Point
     width: float
     length: float
     rotation: float = 0.0  # Degrees
+    status: str = "new"  # "existing", "new"
+    label: Optional[str] = None
+
+
+class EngineeringItem(BaseModel):
+    type: str  # "socket", "switch", "lamp", "radiator", "ac", "vent", "water_outlet"
+    point: Point
+    rotation: float = 0.0
+    level: float = 0.0  # Height from floor
+    label: Optional[str] = None
+
+
+class DimensionLine(BaseModel):
+    points: List[Point]  # Chained points for dimension line
+    offset: float = 0.5  # Distance from objects
+    label_format: str = "{:.0f}"  # mm by default in interior
 
 
 class InteriorPlan(BaseModel):
@@ -46,6 +67,9 @@ class InteriorPlan(BaseModel):
     walls: List[Wall]
     rooms: List[Room] = []
     furniture: List[FurnitureItem] = []
+    engineering: List[EngineeringItem] = []
+    dimensions: List[DimensionLine] = []
+    layer: str = "full"  # "full", "furniture", "electrical", "construction"
     language: str = "ru"
     paper_format: str = "A4"
     orientation: str = "landscape"

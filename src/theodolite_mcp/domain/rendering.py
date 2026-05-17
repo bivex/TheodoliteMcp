@@ -25,6 +25,8 @@ from theodolite_mcp.domain.models import (
     Opening,
     Room,
     FurnitureItem,
+    EngineeringItem,
+    DimensionLine,
 )
 from .logic import calculate_azimuth_from_points, calculate_area
 
@@ -2345,11 +2347,11 @@ def _draw_walls(ax, walls: List[Wall]):
         ls = TYPE_01
         alpha = 1.0
         if wall.status == "demolish":
-            color = "red"
-            ls = (0, (2, 2))  # Fine dashed
+            color = "#E57373"
+            ls = TYPE_02
             alpha = 0.6
         elif wall.status == "new":
-            color = "green"
+            color = "#81C784"
             alpha = 0.8
 
         # Perpendicular vector for thickness
@@ -2366,16 +2368,14 @@ def _draw_walls(ax, walls: List[Wall]):
 
         # Fill wall (material)
         hatch = _get_hatch(wall.material)
-        # Using facecolor for the base fill
         ax.fill(
             w_xs,
             w_ys,
-            color=color if wall.status != "existing" else "lightgray",
-            alpha=0.15 if wall.status == "existing" else 0.2,
+            color=color if wall.status != "existing" else "#F5F5F5",
+            alpha=0.15 if wall.status == "existing" else 0.4,
             zorder=4,
         )
-        if hatch:
-            # Separate fill for hatching with zero linewidth but defined edgecolor
+        if hatch and wall.status != "demolish":
             ax.fill(
                 w_xs,
                 w_ys,
@@ -2383,7 +2383,7 @@ def _draw_walls(ax, walls: List[Wall]):
                 hatch=hatch,
                 edgecolor=color,
                 linewidth=0,
-                alpha=0.3,
+                alpha=0.2,
                 zorder=5,
             )
 
@@ -2392,7 +2392,7 @@ def _draw_walls(ax, walls: List[Wall]):
             w_xs,
             w_ys,
             color=color,
-            linewidth=D_WIDE,
+            linewidth=D_WIDE if wall.status != "demolish" else D,
             linestyle=ls,
             alpha=alpha,
             zorder=6,
@@ -2411,47 +2411,55 @@ def _draw_openings(ax, wall, p1, p2, dx, dy, length, nx, ny):
         ox2 = ox1 + ux * op.width
         oy2 = oy1 + uy * op.width
 
-        if op.type == "window":
-            # Clear the wall fill (draw a white background)
-            win_c1 = (ox1 + nx, oy1 + ny)
-            win_c2 = (ox2 + nx, oy2 + ny)
-            win_c3 = (ox2 - nx, oy2 - ny)
-            win_c4 = (ox1 - nx, oy1 - ny)
-            ax.fill(*zip(win_c1, win_c2, win_c3, win_c4), color="white", zorder=7)
+        # Status styling for opening
+        op_status = getattr(op, "status", wall.status)
+        op_color = "black"
+        if op_status == "demolish":
+            op_color = "#E57373"
+        elif op_status == "new":
+            op_color = "#81C784"
 
+        # Clear the wall fill (draw a white background)
+        win_c1 = (ox1 + nx, oy1 + ny)
+        win_c2 = (ox2 + nx, oy2 + ny)
+        win_c3 = (ox2 - nx, oy2 - ny)
+        win_c4 = (ox1 - nx, oy1 - ny)
+        ax.fill(*zip(win_c1, win_c2, win_c3, win_c4), color="white", zorder=7)
+
+        if op.type == "window":
             # Internal window lines
-            ax.plot([ox1, ox2], [oy1, oy2], color="black", lw=D, zorder=8)
+            ax.plot([ox1, ox2], [oy1, oy2], color=op_color, lw=D, zorder=8)
             ax.plot(
                 [ox1 + nx * 0.5, ox2 + nx * 0.5],
                 [oy1 + ny * 0.5, oy2 + ny * 0.5],
-                color="black",
-                lw=D,
+                color=op_color,
+                lw=D / 2,
                 zorder=8,
             )
             ax.plot(
                 [ox1 - nx * 0.5, ox2 - nx * 0.5],
                 [oy1 - ny * 0.5, oy2 - ny * 0.5],
-                color="black",
-                lw=D,
+                color=op_color,
+                lw=D / 2,
                 zorder=8,
             )
 
         elif op.type == "door":
-            # Door opening arc
-            # Normal vector in direction of opening
-            dnx, dny = (
-                nx / (wall.thickness / 2) * op.width,
-                ny / (wall.thickness / 2) * op.width,
+            # Swing angle and direction
+            sa_deg = getattr(op, "swing_angle", 90.0)
+            leaf_angle_rad = math.atan2(dy, dx) + (
+                math.pi / 2 if op.direction == 1 else -math.pi / 2
             )
-            if op.direction == -1:
-                dnx, dny = -dnx, -dny
-
-            ax.plot([ox1, ox1 + dnx], [oy1, oy1 + dny], color="black", lw=D, zorder=9)
+            
+            # Leaf line
+            lx = ox1 + math.cos(leaf_angle_rad) * op.width
+            ly = oy1 + math.sin(leaf_angle_rad) * op.width
+            ax.plot([ox1, lx], [oy1, ly], color=op_color, lw=D, zorder=9)
 
             # Arc
             angle_wall = math.degrees(math.atan2(dy, dx))
             theta1 = angle_wall
-            theta2 = angle_wall + (90 if op.direction == 1 else -90)
+            theta2 = math.degrees(leaf_angle_rad)
             if theta1 > theta2:
                 theta1, theta2 = theta2, theta1
 
@@ -2462,26 +2470,15 @@ def _draw_openings(ax, wall, p1, p2, dx, dy, length, nx, ny):
                 angle=0,
                 theta1=theta1,
                 theta2=theta2,
-                color="black",
-                lw=D,
+                color=op_color,
+                lw=D / 2,
+                linestyle="--",
                 zorder=9,
             )
             ax.add_patch(arc)
-            # Cover the wall segment with white background
-            ax.fill(
-                *zip(
-                    (ox1 + nx, oy1 + ny),
-                    (ox2 + nx, oy2 + ny),
-                    (ox2 - nx, oy2 - ny),
-                    (ox1 - nx, oy1 - ny),
-                ),
-                color="white",
-                edgecolor="none",
-                zorder=7,
-            )
 
 
-def _draw_furniture(ax, items: List[FurnitureItem]):
+def _draw_furniture(ax, items: List[FurnitureItem], m_per_pt: float = 0.1):
     """
     Renders 2D furniture and sanitary blocks based on type and dimensions.
     """
@@ -2489,6 +2486,12 @@ def _draw_furniture(ax, items: List[FurnitureItem]):
         w, l = item.width, item.length
         cx, cy = item.center_pt.x, item.center_pt.y
         angle = math.radians(item.rotation)
+        status = getattr(item, "status", "new")
+        color = "black"
+        if status == "demolish":
+            color = "#E57373"
+        elif status == "existing":
+            color = "#757575"
 
         def rot(px, py):
             rx = px * math.cos(angle) - py * math.sin(angle)
@@ -2503,12 +2506,18 @@ def _draw_furniture(ax, items: List[FurnitureItem]):
             rot(-w / 2, l / 2),
             rot(-w / 2, -l / 2),
         ]
-        ax.plot(*zip(*corners), color="black", lw=D, alpha=0.7, zorder=8)
+        ax.plot(
+            *zip(*corners),
+            color=color,
+            lw=D,
+            alpha=0.7 if status == "new" else 0.4,
+            zorder=8,
+        )
 
         t = item.type.lower()
         if t == "wc":
             bowl = patches.Circle(
-                rot(0, l * 0.1), w * 0.35, color="black", fill=False, lw=D, zorder=9
+                rot(0, l * 0.1), w * 0.35, color=color, fill=False, lw=D, zorder=9
             )
             ax.add_patch(bowl)
             tank = [
@@ -2518,7 +2527,7 @@ def _draw_furniture(ax, items: List[FurnitureItem]):
                 rot(-w * 0.4, -l * 0.1),
                 rot(-w * 0.4, -l * 0.4),
             ]
-            ax.plot(*zip(*tank), color="black", lw=D, zorder=9)
+            ax.plot(*zip(*tank), color=color, lw=D, zorder=9)
         elif t == "bath":
             inner = patches.Ellipse(
                 rot(0, 0),
@@ -2527,11 +2536,11 @@ def _draw_furniture(ax, items: List[FurnitureItem]):
                 angle=item.rotation,
                 fill=False,
                 lw=D,
+                color=color,
                 zorder=9,
             )
             ax.add_patch(inner)
         elif t == "bed":
-            # Pillows
             for dx in [-0.25, 0.25]:
                 p = [
                     rot(w * dx - w * 0.15, l * 0.25),
@@ -2540,13 +2549,13 @@ def _draw_furniture(ax, items: List[FurnitureItem]):
                     rot(w * dx - w * 0.15, l * 0.4),
                     rot(w * dx - w * 0.15, l * 0.25),
                 ]
-                ax.plot(*zip(*p), color="black", lw=D, zorder=9)
+                ax.plot(*zip(*p), color=color, lw=D, zorder=9)
         elif t == "stove":
             for dx, dy in [(-0.25, -0.25), (0.25, -0.25), (-0.25, 0.25), (0.25, 0.25)]:
                 b = patches.Circle(
                     rot(w * dx, l * dy),
                     w * 0.12,
-                    color="black",
+                    color=color,
                     fill=False,
                     lw=D,
                     zorder=9,
@@ -2555,22 +2564,138 @@ def _draw_furniture(ax, items: List[FurnitureItem]):
         elif t == "sofa":
             ax.plot(
                 *zip(*[rot(-w / 2, l * 0.3), rot(w / 2, l * 0.3)]),
-                color="black",
+                color=color,
                 lw=D,
                 zorder=9,
             )
             ax.plot(
                 *zip(*[rot(-w * 0.4, -l / 2), rot(-w * 0.4, l / 2)]),
-                color="black",
+                color=color,
                 lw=D,
                 zorder=9,
             )
             ax.plot(
                 *zip(*[rot(w * 0.4, -l / 2), rot(w * 0.4, l / 2)]),
-                color="black",
+                color=color,
                 lw=D,
                 zorder=9,
             )
+        elif t in ["fridge", "washer"]:
+            # Standard appliance cross
+            ax.plot(
+                *zip(*[rot(-w / 2, -l / 2), rot(w / 2, l / 2)]),
+                color=color,
+                lw=D / 2,
+                zorder=9,
+            )
+            ax.plot(
+                *zip(*[rot(w / 2, -l / 2), rot(-w / 2, l / 2)]),
+                color=color,
+                lw=D / 2,
+                zorder=9,
+            )
+
+        # Label
+        label = getattr(item, "label", None)
+        if label:
+            ax.text(
+                cx,
+                cy - l / 2 - 0.2,
+                label,
+                fontproperties=_get_font(6, m_per_pt=m_per_pt),
+                ha="center",
+                va="top",
+                zorder=10,
+            )
+
+
+def _draw_engineering(ax, items: List[EngineeringItem], m_per_pt: float = 0.1):
+    """
+    Renders engineering symbols: sockets, switches, lamps, etc.
+    """
+    for item in items:
+        x, y = item.point.x, item.point.y
+        t = item.type.lower()
+        angle = math.radians(item.rotation)
+        
+        def rot(px, py):
+            rx = px * math.cos(angle) - py * math.sin(angle)
+            ry = px * math.sin(angle) + py * math.cos(angle)
+            return rx + x, ry + y
+
+        if t == "socket":
+            # Socket symbol: circle with two lines
+            circle = patches.Circle((x, y), 0.12, color="blue", fill=False, lw=D, zorder=11)
+            ax.add_patch(circle)
+            ax.plot(*zip(*[rot(-0.1, 0.1), rot(-0.2, 0.2)]), color="blue", lw=D, zorder=11)
+            ax.plot(*zip(*[rot(0.1, 0.1), rot(0.2, 0.2)]), color="blue", lw=D, zorder=11)
+        elif t == "switch":
+            # Switch symbol: circle with one L-line
+            circle = patches.Circle((x, y), 0.1, color="orange", fill=False, lw=D, zorder=11)
+            ax.add_patch(circle)
+            ax.plot(*zip(*[rot(0, 0.1), rot(0, 0.2), rot(0.1, 0.2)]), color="orange", lw=D, zorder=11)
+        elif t == "lamp":
+            # Lamp symbol: cross in circle
+            circle = patches.Circle((x, y), 0.15, color="gold", fill=False, lw=D, zorder=11)
+            ax.add_patch(circle)
+            ax.plot(*zip(*[rot(-0.1, -0.1), rot(0.1, 0.1)]), color="gold", lw=D, zorder=11)
+            ax.plot(*zip(*[rot(-0.1, 0.1), rot(0.1, -0.1)]), color="gold", lw=D, zorder=11)
+        elif t == "radiator":
+            # Radiator: rectangle with zig-zag
+            w, l = 0.8, 0.15
+            rect = [rot(-w/2, -l/2), rot(w/2, -l/2), rot(w/2, l/2), rot(-w/2, l/2), rot(-w/2, -l/2)]
+            ax.plot(*zip(*rect), color="brown", lw=D, zorder=11)
+            for i in range(-3, 4):
+                ax.plot(*zip(*[rot(i*0.1, -l/2), rot(i*0.1, l/2)]), color="brown", lw=D/2, zorder=11)
+
+        if item.label:
+            ax.text(x, y + 0.3, item.label, fontproperties=_get_font(5, m_per_pt=m_per_pt), ha="center", zorder=12)
+
+
+def _draw_chained_dimensions(ax, dimensions: List[DimensionLine], m_per_pt: float = 0.1):
+    """
+    Renders professional chained dimension lines.
+    """
+    for dim in dimensions:
+        pts = dim.points
+        if len(pts) < 2:
+            continue
+            
+        # Offset direction logic (simplified: assume sequential points)
+        for i in range(len(pts) - 1):
+            p1, p2 = pts[i], pts[i+1]
+            dist = math.hypot(p2.x - p1.x, p2.y - p1.y)
+            if dist < 0.01: continue
+            
+            # Dimension line offset
+            nx, ny = _perpendicular_offset(p1, p2, dim.offset)
+            d1 = (p1.x + nx, p1.y + ny)
+            d2 = (p2.x + nx, p2.y + ny)
+            
+            # Draw dimension line
+            ax.plot([d1[0], d2[0]], [d1[1], d2[1]], color="black", lw=D/2, zorder=15)
+            
+            # Draw extension lines
+            ax.plot([p1.x, d1[0]], [p1.y, d1[1]], color="gray", lw=D/2, linestyle="--", zorder=14)
+            ax.plot([p2.x, d2[0]], [p2.y, d2[1]], color="gray", lw=D/2, linestyle="--", zorder=14)
+            
+            # Draw ticks
+            angle = math.atan2(p2.y - p1.y, p2.x - p1.x) + math.pi/4
+            tx, ty = math.cos(angle)*0.1, math.sin(angle)*0.1
+            ax.plot([d1[0]-tx, d1[0]+tx], [d1[1]-ty, d1[1]+ty], color="black", lw=D, zorder=16)
+            ax.plot([d2[0]-tx, d2[0]+tx], [d2[1]-ty, d2[1]+ty], color="black", lw=D, zorder=16)
+            
+            # Text (converted to mm)
+            val = dist * 1000
+            txt = dim.label_format.format(val)
+            mx, my = (d1[0]+d2[0])/2, (d1[1]+d2[1])/2
+            rot_deg = math.degrees(math.atan2(p2.y - p1.y, p2.x - p1.x))
+            if rot_deg > 90: rot_deg -= 180
+            if rot_deg < -90: rot_deg += 180
+            
+            ax.text(mx + nx*0.1, my + ny*0.1, txt, fontproperties=_get_font(6, m_per_pt=m_per_pt), 
+                    ha="center", va="bottom", rotation=rot_deg, zorder=17,
+                    bbox=dict(facecolor="white", edgecolor="none", alpha=0.8, pad=0.1))
 
 
 def render_interior_plan(plan: InteriorPlan, output_format: str = "png") -> bytes:
@@ -2648,29 +2773,57 @@ def render_interior_plan(plan: InteriorPlan, output_format: str = "png") -> byte
     ax.set_xlim(cx - view_w_m / 2, cx + view_w_m / 2)
     ax.set_ylim(cy - view_h_m / 2, cy + view_h_m / 2)
 
-    _draw_walls(ax, plan.walls)
+    # 2. Rendering Layers
+    layer = getattr(plan, "layer", "full")
 
-    if plan.furniture:
-        _draw_furniture(ax, plan.furniture)
+    # Layer: Construction (Walls + Demolition)
+    if layer in ["full", "construction"]:
+        _draw_walls(ax, plan.walls)
 
-    # 3.2 Draw Room Labels (Number and Area) with scaled fonts
+    # Layer: Furniture
+    if layer in ["full", "furniture"]:
+        if layer == "furniture":
+            # Just light outlines for walls
+            for w in plan.walls:
+                p1, p2 = w.start_pt, w.end_pt
+                ax.plot([p1.x, p2.x], [p1.y, p2.y], color="#EEEEEE", lw=D_WIDE, zorder=1)
+        
+        if plan.furniture:
+            _draw_furniture(ax, plan.furniture, m_per_pt=m_per_pt)
+
+    # Layer: Engineering (Electrical, Plumbing, HVAC)
+    if layer in ["full", "electrical", "engineering"]:
+        if plan.engineering:
+            _draw_engineering(ax, plan.engineering, m_per_pt=m_per_pt)
+
+    # Layer: Dimensions
+    if layer in ["full", "construction", "furniture"]:
+        if plan.dimensions:
+            _draw_chained_dimensions(ax, plan.dimensions, m_per_pt=m_per_pt)
+
+    # 3. Room Labels and Explication
     for rm in plan.rooms:
         if rm.points:
             rx, ry = _centroid(rm.points)
             area = calculate_area(rm.points) or 0
+            label = f"{rm.number}\n{area:.2f} m²"
+            if rm.wall_finish:
+                label += f"\n({rm.wall_finish})"
+            
             ax.text(
                 rx,
                 ry,
-                f"{rm.number}\n{area:.2f} m²",
+                label,
                 fontproperties=_get_font(7, bold=True, m_per_pt=m_per_pt),
                 ha="center",
                 va="center",
-                zorder=10,
+                zorder=20,
                 bbox=dict(
                     boxstyle="round,pad=0.2",
                     facecolor="white",
-                    alpha=0.7,
-                    edgecolor="none",
+                    alpha=0.8,
+                    edgecolor="#CCCCCC",
+                    lw=0.5
                 ),
             )
 

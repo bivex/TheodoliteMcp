@@ -697,9 +697,30 @@ def draw_interior_plan(
         Optional[list[dict]],
         Field(
             default=None,
-            description="List of furniture blocks (bed, sofa, wc, bath, sink, stove)",
+            description="List of furniture blocks (bed, sofa, wc, bath, sink, stove, fridge, washer)",
         ),
     ] = None,
+    engineering_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of engineering items (socket, switch, lamp, radiator, ac, vent)",
+        ),
+    ] = None,
+    dimensions_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of chained dimension lines with points and offset",
+        ),
+    ] = None,
+    layer: Annotated[
+        str,
+        Field(
+            default="full",
+            description="Active layer: 'full', 'furniture', 'electrical', 'construction'",
+        ),
+    ] = "full",
     language: Annotated[
         str,
         Field(
@@ -722,7 +743,7 @@ def draw_interior_plan(
     """
     Generates a professional architectural floor plan (PNG).
     IMPORTANT: All coordinates and dimensions MUST be in METERS.
-    Supports walls with thickness, door/window openings, and furniture blocks (bed, sofa, wc, bath, sink, stove).
+    Supports walls, openings (doors with arcs), furniture, engineering systems, and layers.
     """
     try:
         if walls_json is None:
@@ -731,6 +752,11 @@ def draw_interior_plan(
             rooms_json = []
         if furniture_json is None:
             furniture_json = []
+        if engineering_json is None:
+            engineering_json = []
+        if dimensions_json is None:
+            dimensions_json = []
+
         walls = []
         for w in walls_json:
             openings = [Opening(**op) for op in w.get("openings", [])]
@@ -750,17 +776,35 @@ def draw_interior_plan(
             pts = [Point(**p) for p in r.get("points", [])]
             rooms.append(
                 Room(
-                    name=r.get("name", "Room"), number=r.get("number", "1"), points=pts
+                    name=r.get("name", "Room"),
+                    number=r.get("number", "1"),
+                    points=pts,
+                    floor_material=r.get("floor_material", "concrete"),
+                    wall_finish=r.get("wall_finish"),
                 )
             )
 
         furniture = [FurnitureItem(**f) for f in furniture_json]
+        engineering = [EngineeringItem(**e) for e in engineering_json]
+        dimensions = []
+        for d in dimensions_json:
+            pts = [Point(**p) for p in d.get("points", [])]
+            dimensions.append(
+                DimensionLine(
+                    points=pts,
+                    offset=d.get("offset", 0.5),
+                    label_format=d.get("label_format", "{:.0f}"),
+                )
+            )
 
         plan = InteriorPlan(
             title=title,
             walls=walls,
             rooms=rooms,
             furniture=furniture,
+            engineering=engineering,
+            dimensions=dimensions,
+            layer=layer,
             language=language,
             paper_format=paper_format,
             scale=scale,
@@ -1391,9 +1435,30 @@ def draw_interior_plan_svg(
         Optional[list[dict]],
         Field(
             default=None,
-            description="List of furniture blocks (bed, sofa, wc, bath, sink, stove)",
+            description="List of furniture blocks (bed, sofa, wc, bath, sink, stove, fridge, washer)",
         ),
     ] = None,
+    engineering_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of engineering items (socket, switch, lamp, radiator, ac, vent)",
+        ),
+    ] = None,
+    dimensions_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of chained dimension lines with points and offset",
+        ),
+    ] = None,
+    layer: Annotated[
+        str,
+        Field(
+            default="full",
+            description="Active layer: 'full', 'furniture', 'electrical', 'construction'",
+        ),
+    ] = "full",
     language: Annotated[
         str,
         Field(
@@ -1428,6 +1493,11 @@ def draw_interior_plan_svg(
             rooms_json = []
         if furniture_json is None:
             furniture_json = []
+        if engineering_json is None:
+            engineering_json = []
+        if dimensions_json is None:
+            dimensions_json = []
+
         walls = []
         for w in walls_json:
             openings = [Opening(**op) for op in w.get("openings", [])]
@@ -1447,17 +1517,35 @@ def draw_interior_plan_svg(
             pts = [Point(**p) for p in r.get("points", [])]
             rooms.append(
                 Room(
-                    name=r.get("name", "Room"), number=r.get("number", "1"), points=pts
+                    name=r.get("name", "Room"),
+                    number=r.get("number", "1"),
+                    points=pts,
+                    floor_material=r.get("floor_material", "concrete"),
+                    wall_finish=r.get("wall_finish"),
                 )
             )
 
         furniture = [FurnitureItem(**f) for f in furniture_json]
+        engineering = [EngineeringItem(**e) for e in engineering_json]
+        dimensions = []
+        for d in dimensions_json:
+            pts = [Point(**p) for p in d.get("points", [])]
+            dimensions.append(
+                DimensionLine(
+                    points=pts,
+                    offset=d.get("offset", 0.5),
+                    label_format=d.get("label_format", "{:.0f}"),
+                )
+            )
 
         plan = InteriorPlan(
             title=title,
             walls=walls,
             rooms=rooms,
             furniture=furniture,
+            engineering=engineering,
+            dimensions=dimensions,
+            layer=layer,
             language=language,
             paper_format=paper_format,
             scale=scale,
