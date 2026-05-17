@@ -1784,8 +1784,7 @@ def draw_heating_system(
         equipment.append(EquipmentSymbol(
             center_pt=Point(x=12, y=9.5),
             equipment_type=EquipmentType.MANIFOLD,
-            tag=l["s_manifold"], # Swapping label/tag to put label above
-            label="M1",
+            tag=f"M1 - {l['s_manifold']}",
             width=m_width,
             height=0.6
         ))
@@ -1798,8 +1797,7 @@ def draw_heating_system(
         equipment.append(EquipmentSymbol(
             center_pt=Point(x=12, y=4.5),
             equipment_type=EquipmentType.MANIFOLD,
-            tag="M2",
-            label=l["r_manifold"],
+            tag=f"M2 - {l['r_manifold']}",
             width=m_width,
             height=0.6
         ))
@@ -1844,7 +1842,7 @@ def draw_heating_system(
         equipment.append(EquipmentSymbol(
             center_pt=Point(x=8, y=2.5),
             equipment_type=EquipmentType.EXPANSION_VESSEL,
-            tag="EV1",
+            tag="GA1",
             width=1.0,
             height=1.2
         ))
