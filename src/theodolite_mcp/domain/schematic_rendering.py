@@ -186,8 +186,8 @@ def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float, tracker: Op
         if et == EquipmentType.BOILER:
             for i in range(3):
                 yy, wave = -hh * 0.5 + i * hh * 0.5, []
-                for t in range(9): wave.append(_rot(cx - hw * 0.6 + t * hw * 0.15, cy + yy + math.sin(t * 1.2) * hh * 0.12, cx, cy, ang))
-                ax.plot(*zip(*wave), color="#CC4400", lw=D, zorder=7)
+                for t in range(21): wave.append(_rot(cx - hw * 0.6 + t * hw * 0.06, cy + yy + math.sin(t * 0.6) * hh * 0.15, cx, cy, ang))
+                ax.plot(*zip(*wave), color="#CC4400", lw=D*1.5, zorder=7)
         elif et == EquipmentType.STORAGE_TANK:
             arc_pts = []
             for t in range(11):
@@ -315,8 +315,9 @@ def render_pipeline_schematic(plan: PipelineSchematic, output_format: str = "png
     xs, ys = [p[0] for p in (pts or [(0,0)])], [p[1] for p in (pts or [(1,1)])]
     min_x, max_x, min_y, max_y = min(xs), max(xs), min(ys), max(ys)
     data_w, data_h = max(max_x - min_x, 0.1), max(max_y - min_y, 0.1)
-    draw_w_mm, draw_h_mm = pw_mm - MARGIN_LEFT - MARGIN_OTHER - STAMP_WIDTH, ph_mm - MARGIN_OTHER * 2
-    m_per_mm = max(data_w / (draw_w_mm * 0.85), data_h / (draw_h_mm * 0.85))
+    # Use full width for calculating scale (stamp covers part of it, but that's fine for pipeline diagrams)
+    draw_w_mm, draw_h_mm = pw_mm - MARGIN_LEFT - MARGIN_OTHER, ph_mm - MARGIN_OTHER * 2
+    m_per_mm = max(data_w / (draw_w_mm * 0.9), data_h / (draw_h_mm * 0.9))
     m_per_pt = m_per_mm / MM_TO_PT
     ax = fig.add_axes([MARGIN_LEFT/pw_mm, MARGIN_OTHER/ph_mm, draw_w_mm/pw_mm, draw_h_mm/ph_mm])
     cx_data, cy_data = (min_x + max_x) / 2, (min_y + max_y) / 2
