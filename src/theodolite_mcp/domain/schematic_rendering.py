@@ -254,6 +254,8 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
     equip = sorted(list(set(e.equipment_type for e in plan.equipment)))
     instr = len(plan.instruments) > 0
     items = [("pipe", m, MEDIA_STYLES.get(m, MEDIA_STYLES[PipeMedium.CUSTOM]).get(f"label_{lang}", m), MEDIA_STYLES.get(m)) for m in media]
+    if media:
+        items.append(("note", "DN", "DN - Номинальный диаметр (мм)" if lang == "ru" else "DN - Nominal Diameter (mm)", None))
     for v in valves: items.append(("valve", v, v, None))
     for e in equip: items.append(("equipment", e, e, None))
     if instr: items.append(("instrument", "iso3511", "КИПиА" if lang == "ru" else "P&ID", None))
@@ -269,6 +271,7 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
     for i, (itype, key, label, style) in enumerate(items):
         ry, sx, tx = legend_h - row_h*(i + 1.8), 12.0, 28.0
         if itype == "pipe" and style: ax_leg.plot([sx-7, sx+7], [ry, ry], color=style["color"], linewidth=D_WIDE*2.5, zorder=10)
+        elif itype == "note": ax_leg.text(sx, ry, "DN", fontproperties=_get_font(9, bold=True, lang=lang), ha="center", va="center", zorder=10)
         elif itype == "valve": _draw_valve_symbol(ax_leg, ValveSymbol(center_pt=ModelPoint(x=sx/40, y=ry/40), valve_type=key, nominal_diameter=200), leg_m_per_pt)
         elif itype == "equipment": _draw_equipment_symbol(ax_leg, EquipmentSymbol(center_pt=ModelPoint(x=sx, y=ry), equipment_type=key, width=10, height=10), leg_m_per_pt)
         elif itype == "instrument": _draw_instrument_bubble(ax_leg, InstrumentSymbol(center_pt=ModelPoint(x=sx, y=ry), measured_variable="X", suffix="Y"), leg_m_per_pt)
