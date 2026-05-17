@@ -230,7 +230,7 @@ def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float, tracker: Op
         lbl = {"pressure_gauge": "P", "thermometer": "T", "flow_meter": "F", "heat_meter": "Q"}.get(et, "")
         ax.text(cx, cy, lbl, fontproperties=_get_font(12, bold=True, m_per_pt=m_per_pt), ha="center", va="center", color="black", zorder=8)
     
-    tag_offset = (h / 2 + 0.4) if et == EquipmentType.MANIFOLD else (max(w, h) / 2 + 0.5)
+    tag_offset = (h / 2 + 0.35) if et == EquipmentType.MANIFOLD else (max(w, h) / 2 + 0.5)
     if eq.tag:
         txt, best_pos = eq.tag, _rot(cx, cy + tag_offset, cx, cy, ang)
         if tracker:
@@ -290,7 +290,7 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
         "F": {"uk": "F - Фільтр", "ru": "F - Фильтр", "en": "F - Filter"},
         "B": {"uk": "B - Бойлер / Котел", "ru": "B - Бойлер / Котел", "en": "B - Boiler"},
         "GA": {"uk": "GA - Розширювальний бак", "ru": "GA - Расширительный бак", "en": "GA - Expansion Vessel"},
-        "P": {"uk": "P - Насос", "ru": "P - Насос", "en": "P - Pump"},
+        "PU": {"uk": "PU - Насос", "ru": "PU - Насос", "en": "PU - Насос"},
         "T": {"uk": "T - Резервуар", "ru": "T - Резервуар", "en": "T - Tank"},
         "M": {"uk": "M - Колектор / Гребінка", "ru": "M - Коллектор / Гребенка", "en": "M - Manifold"},
         "PI": {"uk": "PI - Манометр (Індикатор)", "ru": "PI - Манометр", "en": "PI - Pressure Indicator"},

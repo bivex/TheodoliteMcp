@@ -1784,11 +1784,12 @@ def draw_heating_system(
         equipment.append(EquipmentSymbol(
             center_pt=Point(x=12, y=9.5),
             equipment_type=EquipmentType.MANIFOLD,
-            tag="M1",
-            label=l["s_manifold"],
+            tag=l["s_manifold"], # Swapping label/tag to put label above
+            label="M1",
             width=m_width,
             height=0.6
         ))
+
         # Air vent on supply manifold (right end)
         pipes.append(PipeSegment(start_pt=Point(x=12 + m_width/2, y=9.5), end_pt=Point(x=12 + m_width/2, y=10.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=15))
         instruments.append(InstrumentSymbol(center_pt=Point(x=12 + m_width/2, y=10.5), measured_variable="L", suffix="A", tag_number="01"))
@@ -1830,7 +1831,7 @@ def draw_heating_system(
         equipment.append(EquipmentSymbol(
             center_pt=Point(x=6, y=4.5),
             equipment_type=EquipmentType.CIRCULATION_PUMP,
-            tag="P1",
+            tag="PU1",
             label=l["pump"],
             width=0.8,
             height=0.8
