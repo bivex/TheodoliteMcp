@@ -267,14 +267,21 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
     ax_leg.set_xlim(0, legend_w); ax_leg.set_ylim(0, legend_h); ax_leg.axis("off")
     ax_leg.add_patch(Rectangle((0, 0), legend_w, legend_h, fc="white", ec="black", lw=D_WIDE, alpha=0.9, zorder=9))
     ax_leg.text(legend_w/2, legend_h - row_h*0.6, "УСЛОВНЫЕ ОБОЗНАЧЕНИЯ" if lang == "ru" else "LEGEND", fontproperties=_get_font(12, bold=True, lang=lang), ha="center", va="center", zorder=10)
-    leg_m_per_pt = 40.0 / MM_TO_PT
+    leg_m_per_pt = 1.0 / MM_TO_PT # 1 unit = 1 mm
     for i, (itype, key, label, style) in enumerate(items):
         ry, sx, tx = legend_h - row_h*(i + 1.8), 12.0, 28.0
         if itype == "pipe" and style: ax_leg.plot([sx-7, sx+7], [ry, ry], color=style["color"], linewidth=D_WIDE*2.5, zorder=10)
         elif itype == "note": ax_leg.text(sx, ry, "DN", fontproperties=_get_font(9, bold=True, lang=lang), ha="center", va="center", zorder=10)
-        elif itype == "valve": _draw_valve_symbol(ax_leg, ValveSymbol(center_pt=ModelPoint(x=sx/40, y=ry/40), valve_type=key, nominal_diameter=200), leg_m_per_pt)
-        elif itype == "equipment": _draw_equipment_symbol(ax_leg, EquipmentSymbol(center_pt=ModelPoint(x=sx, y=ry), equipment_type=key, width=10, height=10), leg_m_per_pt)
-        elif itype == "instrument": _draw_instrument_bubble(ax_leg, InstrumentSymbol(center_pt=ModelPoint(x=sx, y=ry), measured_variable="X", suffix="Y"), leg_m_per_pt)
+        elif itype == "valve":
+            # To get s approx 6mm, we need DN/1000 * 0.8 = 6 => DN = 7500. Let's use 8000.
+            v = ValveSymbol(center_pt=ModelPoint(x=sx, y=ry), valve_type=key, nominal_diameter=8000)
+            _draw_valve_symbol(ax_leg, v, leg_m_per_pt)
+        elif itype == "equipment":
+            v = EquipmentSymbol(center_pt=ModelPoint(x=sx, y=ry), equipment_type=key, width=10, height=10)
+            _draw_equipment_symbol(ax_leg, v, leg_m_per_pt)
+        elif itype == "instrument":
+            v = InstrumentSymbol(center_pt=ModelPoint(x=sx, y=ry), measured_variable="X", suffix="Y")
+            _draw_instrument_bubble(ax_leg, v, leg_m_per_pt)
         ax_leg.text(tx, ry, label, fontproperties=_get_font(10, lang=lang), ha="left", va="center", zorder=10)
 
 def render_pipeline_schematic(plan: PipelineSchematic, output_format: str = "png") -> bytes:
