@@ -344,6 +344,20 @@ def draw_plot_plan(
             description="List of zone definitions with name, points, and styling",
         ),
     ] = None,
+    landscape_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of landscape items (tree_conifer, tree_deciduous, shrub, lamp_post, bench)",
+        ),
+    ] = None,
+    utilities_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of underground utility lines (water, sewage, electricity, gas)",
+        ),
+    ] = None,
     security_json: Annotated[
         Optional[list[dict]],
         Field(
@@ -426,11 +440,35 @@ def draw_plot_plan(
                     fill_alpha=z.get("fill_alpha", 0.3),
                 )
             )
+        landscape = []
+        if landscape_json:
+            for l in landscape_json:
+                landscape.append(LandscapeItem(
+                    type=l["type"],
+                    point=Point(**l["point"]),
+                    size=l.get("size", 1.0),
+                    label=l.get("label"),
+                    light_range=l.get("light_range", 0.0)
+                ))
+                
+        utilities = []
+        if utilities_json:
+            for u in utilities_json:
+                u_pts = [Point(**p) for p in u.get("points", [])]
+                utilities.append(UtilityLine(
+                    type=u["type"],
+                    points=u_pts,
+                    depth=u.get("depth", 0.0),
+                    label=u.get("label")
+                ))
+
         security = [SecurityItem(**s) for s in security_json] if security_json else []
         plan = PlotPlan(
             title=title,
             boundary_points=boundary_points,
             zones=zones,
+            landscape=landscape,
+            utilities=utilities,
             security=security,
             language=language,
             standard=standard,
@@ -1321,6 +1359,20 @@ def draw_plot_plan_svg(
             description="List of zone definitions with name, points, and styling",
         ),
     ] = None,
+    landscape_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of landscape items (tree_conifer, tree_deciduous, shrub, lamp_post, bench)",
+        ),
+    ] = None,
+    utilities_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of underground utility lines (water, sewage, electricity, gas)",
+        ),
+    ] = None,
     security_json: Annotated[
         Optional[list[dict]],
         Field(
@@ -1401,11 +1453,35 @@ def draw_plot_plan_svg(
                     fill_alpha=z.get("fill_alpha", 0.3),
                 )
             )
+        landscape = []
+        if landscape_json:
+            for l in landscape_json:
+                landscape.append(LandscapeItem(
+                    type=l["type"],
+                    point=Point(**l["point"]),
+                    size=l.get("size", 1.0),
+                    label=l.get("label"),
+                    light_range=l.get("light_range", 0.0)
+                ))
+                
+        utilities = []
+        if utilities_json:
+            for u in utilities_json:
+                u_pts = [Point(**p) for p in u.get("points", [])]
+                utilities.append(UtilityLine(
+                    type=u["type"],
+                    points=u_pts,
+                    depth=u.get("depth", 0.0),
+                    label=u.get("label")
+                ))
+
         security = [SecurityItem(**s) for s in security_json] if security_json else []
         plan = PlotPlan(
             title=title,
             boundary_points=boundary_points,
             zones=zones,
+            landscape=landscape,
+            utilities=utilities,
             security=security,
             language=language,
             standard=standard,

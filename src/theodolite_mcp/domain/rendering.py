@@ -28,6 +28,8 @@ from theodolite_mcp.domain.models import (
     EngineeringItem,
     SecurityItem,
     DimensionLine,
+    LandscapeItem,
+    UtilityLine,
 )
 from .logic import calculate_azimuth_from_points, calculate_area
 
@@ -3025,6 +3027,71 @@ def render_interior_plan(plan: InteriorPlan, output_format: str = "png") -> byte
     return buf.getvalue()
 
 
+def _draw_landscape(ax, items: List[LandscapeItem], m_per_pt: float = 0.1):
+    """
+    Renders landscape elements: trees, shrubs, lighting, benches.
+    """
+    for item in items:
+        x, y = item.point.x, item.point.y
+        t = item.type.lower()
+        r = item.size / 2
+        
+        if t == "tree_conifer":
+            # Stylized star/conifer shape
+            ax.plot(x, y, "*", color="#2E7D32", markersize=item.size*5, zorder=12)
+            circle = patches.Circle((x, y), r, color="#2E7D32", fill=False, lw=D/2, linestyle="--", alpha=0.5, zorder=11)
+            ax.add_patch(circle)
+        elif t == "tree_deciduous":
+            # Cloud-like circle
+            circle = patches.Circle((x, y), r, color="#4CAF50", fill=True, alpha=0.3, zorder=11)
+            ax.add_patch(circle)
+            ax.plot(x, y, "o", color="#1B5E20", markersize=2, zorder=12)
+        elif t == "shrub":
+            circle = patches.Circle((x, y), r, color="#81C784", fill=True, alpha=0.5, zorder=11)
+            ax.add_patch(circle)
+        elif t == "lamp_post":
+            # Lamp post with light cone
+            ax.plot(x, y, "o", color="black", markersize=3, zorder=15)
+            if item.light_range > 0:
+                light = patches.Circle((x, y), item.light_range, color="#FFF59D", fill=True, alpha=0.2, zorder=10)
+                ax.add_patch(light)
+        elif t == "bench":
+            rect = patches.Rectangle((x-r, y-r/2), item.size, r, color="#795548", zorder=12)
+            ax.add_patch(rect)
+
+        if item.label:
+            ax.text(x, y + r + 0.5, item.label, fontproperties=_get_font(6, m_per_pt=m_per_pt), ha="center", zorder=16)
+
+def _draw_utilities(ax, lines: List[UtilityLine], m_per_pt: float = 0.1):
+    """
+    Renders underground utility lines with standard colors and labels.
+    """
+    colors = {
+        "water": "#2196F3",    # Blue
+        "sewage": "#795548",   # Brown
+        "electricity": "#FFC107", # Yellow
+        "gas": "#F44336",      # Red
+        "irrigation": "#4FC3F7" # Cyan
+    }
+    
+    for line in lines:
+        pts = line.points
+        if len(pts) < 2: continue
+        
+        xs, ys = zip(*[(p.x, p.y) for p in pts])
+        color = colors.get(line.type.lower(), "gray")
+        
+        # Dashed line for underground
+        ax.plot(xs, ys, color=color, lw=D, linestyle=(0, (5, 5)), zorder=5)
+        
+        # Label in the middle
+        mx, my = (xs[0]+xs[-1])/2, (ys[0]+ys[-1])/2
+        txt = f"{line.type.upper()}"
+        if line.depth > 0: txt += f" (d={line.depth}m)"
+        ax.text(mx, my, txt, fontproperties=_get_font(5, italic=True), color=color, 
+                ha="center", va="center", bbox=dict(facecolor="white", edgecolor="none", alpha=0.8, pad=0))
+
+
 def render_plot_plan(plan: PlotPlan, output_format: str = "png") -> bytes:
     # Ensure hatch linewidth is set for thread safety (constant value)
     matplotlib.rcParams["hatch.linewidth"] = D
@@ -3133,6 +3200,12 @@ def render_plot_plan(plan: PlotPlan, output_format: str = "png") -> bytes:
             m_per_pt=m_per_pt,
             tracker=label_tracker,
         )
+
+    if getattr(plan, "utilities", None):
+        _draw_utilities(ax, plan.utilities, m_per_pt=m_per_pt)
+
+    if getattr(plan, "landscape", None):
+        _draw_landscape(ax, plan.landscape, m_per_pt=m_per_pt)
 
     if getattr(plan, "security", None):
         _draw_security(ax, plan.security, m_per_pt=m_per_pt)

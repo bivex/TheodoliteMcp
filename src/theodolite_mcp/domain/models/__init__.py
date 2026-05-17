@@ -1,5 +1,5 @@
 from .base import Point
-from .survey import AsBuiltPoint, GridCell, VolumeGrid, Zone, PlotPlan
+from .survey import AsBuiltPoint, GridCell, VolumeGrid, Zone, PlotPlan, LandscapeItem, UtilityLine
 from .profile import ProfilePoint, ProfilePlan
 from .interior import Opening, Wall, Room, FurnitureItem, InteriorPlan, EngineeringItem, DimensionLine, InteriorReport, SecurityItem
 from .traverse import (
@@ -19,6 +19,8 @@ __all__ = [
     'VolumeGrid',
     'Zone',
     'PlotPlan',
+    'LandscapeItem',
+    'UtilityLine',
     'ProfilePoint',
     'ProfilePlan',
     'Opening',

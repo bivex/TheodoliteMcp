@@ -39,6 +39,21 @@ class Zone(BaseModel):
     fill_alpha: float = 0.3
 
 
+class LandscapeItem(BaseModel):
+    type: str  # "tree_conifer", "tree_deciduous", "shrub", "lamp_post", "bench", "bbq"
+    point: Point
+    size: float = 1.0  # Diameter of crown or object size
+    label: Optional[str] = None
+    light_range: float = 0.0  # For lamps
+
+
+class UtilityLine(BaseModel):
+    type: str  # "water", "sewage", "electricity", "gas", "irrigation"
+    points: List[Point]
+    depth: float = 0.0
+    label: Optional[str] = None
+
+
 class PlotPlan(BaseModel):
     title: str = "Cadastral Plan"
     project_number: str = "P-001"
@@ -46,6 +61,8 @@ class PlotPlan(BaseModel):
     date: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
     boundary_points: List[Point]
     zones: List[Zone] = []
+    landscape: List[LandscapeItem] = []
+    utilities: List[UtilityLine] = []
     security: List[SecurityItem] = []
     language: str = "ru"  # "ru", "uk", "en"
     standard: str = (
