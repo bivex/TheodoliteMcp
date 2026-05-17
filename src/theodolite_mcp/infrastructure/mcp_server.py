@@ -1738,27 +1738,27 @@ def draw_heating_system(
     """
     Automatically generates a professional heating system schematic (ISO 6412/14617).
     Connects one boiler to multiple radiators via supply and return manifolds.
-    Includes pumps, valves, and expansion vessel.
+    Includes pumps, safety valves, expansion vessel, and instrumentation.
     """
     try:
         from theodolite_mcp.domain.models.schematic import (
             PipelineSchematic, PipeSegment, EquipmentSymbol, ValveSymbol, 
-            EquipmentType, ValveType, PipeMedium
+            EquipmentType, ValveType, PipeMedium, InstrumentSymbol
         )
         
         # Localized labels
         labels = {
-            "en": {"pump": "Heating Pump", "s_manifold": "Supply Manifold", "r_manifold": "Return Manifold"},
-            "uk": {"pump": "Циркуляційний насос", "s_manifold": "Подаючий колектор", "r_manifold": "Зворотній колектор"},
-            "ru": {"pump": "Циркуляционный насос", "s_manifold": "Подающий коллектор", "r_manifold": "Обратный коллектор"},
+            "en": {"pump": "Heating Pump", "s_manifold": "Supply Manifold", "r_manifold": "Return Manifold", "safety": "Safety Group"},
+            "uk": {"pump": "Циркуляційний насос", "s_manifold": "Подаючий колектор", "r_manifold": "Зворотній колектор", "safety": "Група безпеки"},
+            "ru": {"pump": "Циркуляционный насос", "s_manifold": "Подающий коллектор", "r_manifold": "Обратный коллектор", "safety": "Группа безопасности"},
         }
         l = labels.get(language, labels["en"])
         
-        pipes, equipment, valves = [], [], []
+        pipes, equipment, valves, instruments = [], [], [], []
         
-        # 1. Boiler at the left
+        # 1. Boiler
         equipment.append(EquipmentSymbol(
-            center_pt=Point(x=2, y=10),
+            center_pt=Point(x=2, y=8),
             equipment_type=EquipmentType.BOILER,
             tag="B1",
             label=boiler_label,
@@ -1766,69 +1766,100 @@ def draw_heating_system(
             height=3.0
         ))
         
-        # 2. Boiler Supply Line
-        pipes.append(PipeSegment(start_pt=Point(x=3, y=11), end_pt=Point(x=5, y=11), medium=PipeMedium.HEATING_SUPPLY))
-        valves.append(ValveSymbol(center_pt=Point(x=4, y=11), valve_type=ValveType.BALL, tag="V1"))
+        # 2. Boiler Supply with Safety Group
+        pipes.append(PipeSegment(start_pt=Point(x=3, y=9.5), end_pt=Point(x=8, y=9.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=32))
+        valves.append(ValveSymbol(center_pt=Point(x=4, y=9.5), valve_type=ValveType.BALL, tag="V1"))
         
-        # 3. Circulation Pump
+        # Safety Valve (PRV) - connected as a branch
+        pipes.append(PipeSegment(start_pt=Point(x=5, y=9.5), end_pt=Point(x=5, y=10.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=20))
+        valves.append(ValveSymbol(center_pt=Point(x=5, y=10.5), valve_type=ValveType.SAFETY_RELIEF, tag="PRV1"))
+        
+        # Pressure Gauge
+        instruments.append(InstrumentSymbol(center_pt=Point(x=6, y=10.5), measured_variable="P", tag_number="01"))
+        pipes.append(PipeSegment(start_pt=Point(x=6, y=9.5), end_pt=Point(x=6, y=10.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=15))
+        
+        # 3. Supply Manifold
+        m_width = max(3.0, radiator_count * 1.5)
         equipment.append(EquipmentSymbol(
-            center_pt=Point(x=6, y=11),
+            center_pt=Point(x=12, y=9.5),
+            equipment_type=EquipmentType.MANIFOLD,
+            tag="M1",
+            label=l["s_manifold"],
+            width=m_width,
+            height=0.6
+        ))
+        
+        # 4. Return Manifold
+        equipment.append(EquipmentSymbol(
+            center_pt=Point(x=12, y=4.5),
+            equipment_type=EquipmentType.MANIFOLD,
+            tag="M2",
+            label=l["r_manifold"],
+            width=m_width,
+            height=0.6
+        ))
+        
+        # 5. Radiators with proper connectivity
+        m_start_x = 12 - m_width/2 + 0.75
+        for i in range(radiator_count):
+            rx = m_start_x + i * 1.5
+            # Radiator symbol
+            equipment.append(EquipmentSymbol(
+                center_pt=Point(x=rx, y=7),
+                equipment_type=EquipmentType.RADIATOR,
+                tag=f"R{i+1}",
+                width=1.0,
+                height=0.8
+            ))
+            # Supply connection (DN20)
+            pipes.append(PipeSegment(start_pt=Point(x=rx, y=9.2), end_pt=Point(x=rx, y=7.4), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=20))
+            valves.append(ValveSymbol(center_pt=Point(x=rx, y=8.5), valve_type=ValveType.GLOBE, tag=f"VR{i+1}s")) # Control valve
+            
+            # Return connection (DN20)
+            pipes.append(PipeSegment(start_pt=Point(x=rx, y=6.6), end_pt=Point(x=rx, y=4.8), medium=PipeMedium.HEATING_RETURN, nominal_diameter=20))
+            valves.append(ValveSymbol(center_pt=Point(x=rx, y=5.5), valve_type=ValveType.BALL, tag=f"VR{i+1}r")) # Shut-off
+            
+        # 6. Return Line to Boiler with Pump and EV
+        pipes.append(PipeSegment(start_pt=Point(x=12 - m_width/2, y=4.5), end_pt=Point(x=3, y=4.5), medium=PipeMedium.HEATING_RETURN, nominal_diameter=32))
+        
+        # Pump on Return line
+        equipment.append(EquipmentSymbol(
+            center_pt=Point(x=6, y=4.5),
             equipment_type=EquipmentType.CIRCULATION_PUMP,
             tag="P1",
             label=l["pump"],
             width=0.8,
             height=0.8
         ))
-        pipes.append(PipeSegment(start_pt=Point(x=7, y=11), end_pt=Point(x=9, y=11), medium=PipeMedium.HEATING_SUPPLY))
+        valves.append(ValveSymbol(center_pt=Point(x=5, y=4.5), valve_type=ValveType.BALL, tag="V2")) # Before pump
+        valves.append(ValveSymbol(center_pt=Point(x=7, y=4.5), valve_type=ValveType.BALL, tag="V3")) # After pump
         
-        # 4. Supply Manifold
+        # Expansion Vessel (Parallel connection)
+        pipes.append(PipeSegment(start_pt=Point(x=8, y=4.5), end_pt=Point(x=8, y=3.0), medium=PipeMedium.HEATING_RETURN, nominal_diameter=20))
         equipment.append(EquipmentSymbol(
-            center_pt=Point(x=12, y=11),
-            equipment_type=EquipmentType.MANIFOLD,
-            tag="M1",
-            label=l["s_manifold"],
-            width=4.0,
-            height=0.6
-        ))
-        
-        # 5. Return Manifold
-        equipment.append(EquipmentSymbol(
-            center_pt=Point(x=12, y=5),
-            equipment_type=EquipmentType.MANIFOLD,
-            tag="M2",
-            label=l["r_manifold"],
-            width=4.0,
-            height=0.6
-        ))
-        
-        # 6. Radiators
-        for i in range(radiator_count):
-            rx = 10 + i * 2.5
-            # Radiator symbol
-            equipment.append(EquipmentSymbol(
-                center_pt=Point(x=rx, y=8),
-                equipment_type=EquipmentType.RADIATOR,
-                tag=f"R{i+1}",
-                width=1.2,
-                height=1.0
-            ))
-            # Connections to manifolds
-            pipes.append(PipeSegment(start_pt=Point(x=rx, y=10.7), end_pt=Point(x=rx, y=8.5), medium=PipeMedium.HEATING_SUPPLY))
-            pipes.append(PipeSegment(start_pt=Point(x=rx, y=7.5), end_pt=Point(x=rx, y=5.3), medium=PipeMedium.HEATING_RETURN))
-            
-        # 7. Return to Boiler
-        pipes.append(PipeSegment(start_pt=Point(x=10, y=5), end_pt=Point(x=3, y=5), medium=PipeMedium.HEATING_RETURN))
-        pipes.append(PipeSegment(start_pt=Point(x=3, y=5), end_pt=Point(x=3, y=8.5), medium=PipeMedium.HEATING_RETURN))
-        
-        # 8. Expansion Vessel
-        pipes.append(PipeSegment(start_pt=Point(x=5, y=5), end_pt=Point(x=5, y=3.5), medium=PipeMedium.HEATING_RETURN))
-        equipment.append(EquipmentSymbol(
-            center_pt=Point(x=5, y=3),
+            center_pt=Point(x=8, y=2.5),
             equipment_type=EquipmentType.EXPANSION_VESSEL,
             tag="EV1",
             width=1.0,
-            height=1.0
+            height=1.2
         ))
+        
+        # Connect return to boiler entry
+        pipes.append(PipeSegment(start_pt=Point(x=3, y=4.5), end_pt=Point(x=3, y=6.5), medium=PipeMedium.HEATING_RETURN, nominal_diameter=32))
+        valves.append(ValveSymbol(center_pt=Point(x=3, y=5.5), valve_type=ValveType.BALL, tag="V4"))
+
+        plan = PipelineSchematic(
+            title=title,
+            pipes=pipes,
+            equipment=equipment,
+            valves=valves,
+            instruments=instruments,
+            language=language
+        )
+        png_bytes = service.render_schematic(plan, output_path=output_path)
+        return Image(data=png_bytes, format="png")
+    except Exception as e:
+        raise ValueError(f"draw_heating_system error: {e}") from e
 
         plan = PipelineSchematic(
             title=title,
