@@ -105,6 +105,15 @@ class SurveyService:
                 "status": f.status
             })
             
+        # 4. Security List
+        for s in getattr(plan, "security", []):
+            report.security_list.append({
+                "type": s.type,
+                "label": s.label or "N/A",
+                "range": f"{s.range} m",
+                "fov": f"{s.fov_angle}°"
+            })
+            
         return report
 
     def render_schematic(

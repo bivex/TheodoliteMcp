@@ -63,6 +63,15 @@ class DimensionLine(BaseModel):
     label_format: str = "{:.0f}"  # mm by default in interior
 
 
+class SecurityItem(BaseModel):
+    type: str  # "camera", "motion_sensor", "door_sensor", "glass_break", "keypad", "siren"
+    point: Point
+    rotation: float = 0.0
+    fov_angle: float = 90.0  # For cameras and motion sensors
+    range: float = 5.0  # Effective distance in meters
+    label: Optional[str] = None
+
+
 class InteriorPlan(BaseModel):
     title: str = "Floor Plan"
     project_number: str = "A-001"
@@ -72,8 +81,9 @@ class InteriorPlan(BaseModel):
     rooms: List[Room] = []
     furniture: List[FurnitureItem] = []
     engineering: List[EngineeringItem] = []
+    security: List[SecurityItem] = []
     dimensions: List[DimensionLine] = []
-    layer: str = "full"  # "full", "furniture", "electrical", "construction"
+    layer: str = "full"  # "full", "furniture", "electrical", "construction", "security"
     show_ergonomics: bool = False  # Highlight clearance violations
     language: str = "ru"
     paper_format: str = "A4"
@@ -87,5 +97,6 @@ class InteriorReport(BaseModel):
     tile_counts: dict[str, dict[str, int]] = {}  # room_name -> {total, cut}
     material_list: list[dict[str, str]] = []
     furniture_list: list[dict[str, str]] = []
+    security_list: list[dict[str, str]] = []
     ergonomics_warnings: list[str] = []
     total_area: float = 0.0

@@ -707,6 +707,13 @@ def draw_interior_plan(
             description="List of engineering items (socket, switch, lamp, radiator, ac, vent)",
         ),
     ] = None,
+    security_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of security items (camera, motion_sensor, keypad, siren)",
+        ),
+    ] = None,
     dimensions_json: Annotated[
         Optional[list[dict]],
         Field(
@@ -803,6 +810,7 @@ def draw_interior_plan(
             )
 
         engineering = [EngineeringItem(**e) for e in engineering_json]
+        security = [SecurityItem(**s) for s in security_json]
         dimensions = []
         for d in dimensions_json:
             pts = [Point(**p) for p in d.get("points", [])]
@@ -820,6 +828,7 @@ def draw_interior_plan(
             rooms=rooms,
             furniture=furniture,
             engineering=engineering,
+            security=security,
             dimensions=dimensions,
             layer=layer,
             show_ergonomics=show_ergonomics if "show_ergonomics" in locals() else False,
@@ -1494,6 +1503,13 @@ def draw_interior_plan_svg(
             description="List of engineering items (socket, switch, lamp, radiator, ac, vent)",
         ),
     ] = None,
+    security_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of security items (camera, motion_sensor, keypad, siren)",
+        ),
+    ] = None,
     dimensions_json: Annotated[
         Optional[list[dict]],
         Field(
@@ -1576,6 +1592,7 @@ def draw_interior_plan_svg(
 
         furniture = [FurnitureItem(**f) for f in furniture_json]
         engineering = [EngineeringItem(**e) for e in engineering_json]
+        security = [SecurityItem(**s) for s in security_json]
         dimensions = []
         for d in dimensions_json:
             pts = [Point(**p) for p in d.get("points", [])]
@@ -1593,6 +1610,7 @@ def draw_interior_plan_svg(
             rooms=rooms,
             furniture=furniture,
             engineering=engineering,
+            security=security,
             dimensions=dimensions,
             layer=layer,
             language=language,

@@ -26,6 +26,7 @@ from theodolite_mcp.domain.models import (
     Room,
     FurnitureItem,
     EngineeringItem,
+    SecurityItem,
     DimensionLine,
 )
 from .logic import calculate_azimuth_from_points, calculate_area
@@ -2803,6 +2804,67 @@ def _draw_ergonomics_warnings(ax, furniture: List[FurnitureItem], walls: List[Wa
                             color="red", fontsize=8, fontweight="bold")
 
 
+def _draw_security(ax, items: List[SecurityItem], m_per_pt: float = 0.1):
+    """
+    Renders security systems: cameras with FOV, motion sensors, etc.
+    """
+    for item in items:
+        x, y = item.point.x, item.point.y
+        t = item.type.lower()
+        angle = math.radians(item.rotation)
+        fov_half = math.radians(item.fov_angle / 2)
+        
+        def rot(px, py):
+            rx = px * math.cos(angle) - py * math.sin(angle)
+            ry = px * math.sin(angle) + py * math.cos(angle)
+            return rx + x, ry + y
+
+        if t == "camera":
+            # Camera Body
+            rect = [rot(-0.1, -0.05), rot(0.1, -0.05), rot(0.1, 0.05), rot(-0.1, 0.05), rot(-0.1, -0.05)]
+            ax.plot(*zip(*rect), color="#D32F2F", lw=D, zorder=18)
+            ax.plot(*zip(*[rot(0.1, 0), rot(0.15, 0)]), color="#D32F2F", lw=D, zorder=18)
+            
+            # FOV Cone (Semi-transparent wedge)
+            wedge = patches.Wedge((x, y), item.range, 
+                                  math.degrees(angle - fov_half), 
+                                  math.degrees(angle + fov_half), 
+                                  color="red", alpha=0.1, zorder=17)
+            ax.add_patch(wedge)
+            
+        elif t == "motion_sensor":
+            # Stylized fan
+            wedge = patches.Wedge((x, y), item.range, 
+                                  math.degrees(angle - fov_half), 
+                                  math.degrees(angle + fov_half), 
+                                  color="orange", alpha=0.15, zorder=17, hatch="///")
+            ax.add_patch(wedge)
+            ax.plot(x, y, "o", color="orange", markersize=3, zorder=18)
+
+        elif t == "door_sensor":
+            ax.plot(x, y, "s", color="black", markersize=2, zorder=18)
+            ax.text(x, y+0.1, "MS", fontsize=5, ha="center", zorder=19)
+
+        elif t == "keypad":
+            # Numeric keypad icon
+            rect = [rot(-0.1, -0.15), rot(0.1, -0.15), rot(0.1, 0.15), rot(-0.1, 0.15), rot(-0.1, -0.15)]
+            ax.plot(*zip(*rect), color="black", lw=D, zorder=18)
+            for i in range(-1, 2):
+                ax.plot(*zip(*[rot(-0.05, i*0.05), rot(0.05, i*0.05)]), color="black", lw=D/2, zorder=18)
+
+        elif t == "siren":
+            circle = patches.Circle((x, y), 0.15, color="red", fill=True, alpha=0.2, zorder=18)
+            ax.add_patch(circle)
+            for r in [0.2, 0.3]:
+                arc = patches.Arc((x, y), r*2, r*2, theta1=0, theta2=360, color="red", lw=D/2, linestyle=":", zorder=18)
+                ax.add_patch(arc)
+
+        if item.label:
+            ax.text(x, y - 0.3, item.label, fontproperties=_get_font(5, m_per_pt=m_per_pt), 
+                    color="darkred", ha="center", zorder=20, 
+                    bbox=dict(facecolor="white", edgecolor="none", alpha=0.7, pad=0))
+
+
 def render_interior_plan(plan: InteriorPlan, output_format: str = "png") -> bytes:
     # Ensure hatch linewidth is set for thread safety (constant value)
     matplotlib.rcParams["hatch.linewidth"] = D
@@ -2909,6 +2971,11 @@ def render_interior_plan(plan: InteriorPlan, output_format: str = "png") -> byte
     if layer in ["full", "electrical", "engineering"]:
         if plan.engineering:
             _draw_engineering(ax, plan.engineering, m_per_pt=m_per_pt)
+
+    # Layer: Security
+    if layer in ["full", "security"]:
+        if plan.security:
+            _draw_security(ax, plan.security, m_per_pt=m_per_pt)
 
     # Layer: Dimensions
     if layer in ["full", "construction", "furniture"]:
