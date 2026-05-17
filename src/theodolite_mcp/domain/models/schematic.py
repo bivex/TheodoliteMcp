@@ -76,6 +76,7 @@ class PipeSegment(BaseModel):
     insulated: bool = False
     flow_direction: str = "forward"  # "forward", "backward", "none"
     custom_color: Optional[str] = None
+    show_dn_label: bool = True  # False = auxiliary line (dimension, border) — no DN label
 
 
 class ValveSymbol(BaseModel):

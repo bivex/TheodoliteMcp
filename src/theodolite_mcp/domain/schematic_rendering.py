@@ -114,7 +114,7 @@ def _draw_pipe_segment(ax, pipe: PipeSegment, m_per_pt: float, tracker: Optional
         base2 = (mx - ux * arrow_size * 0.4 - perp_x, my - uy * arrow_size * 0.4 - perp_y)
         ax.add_patch(Polygon([tip, base1, base2], closed=True, fc=color, ec=color, zorder=3))
 
-    if math.hypot(x2 - x1, y2 - y1) > 0.4:
+    if pipe.show_dn_label and math.hypot(x2 - x1, y2 - y1) > 0.4:
         mx, my, seg_len = (x1 + x2) / 2, (y1 + y2) / 2, math.hypot(x2 - x1, y2 - y1)
         nx, ny = -(y2-y1)/seg_len, (x2-x1)/seg_len
         txt = f"DN{pipe.nominal_diameter}"
