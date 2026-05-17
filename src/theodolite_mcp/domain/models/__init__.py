@@ -1,7 +1,7 @@
 from .base import Point
 from .survey import AsBuiltPoint, GridCell, VolumeGrid, Zone, PlotPlan
 from .profile import ProfilePoint, ProfilePlan
-from .interior import Opening, Wall, Room, FurnitureItem, InteriorPlan, EngineeringItem, DimensionLine
+from .interior import Opening, Wall, Room, FurnitureItem, InteriorPlan, EngineeringItem, DimensionLine, InteriorReport
 from .traverse import (
     StadiaMeasurement, StadiaResult, Observation,
     EDMParameters, TraverseData, TraverseResult
@@ -28,6 +28,7 @@ __all__ = [
     'InteriorPlan',
     'EngineeringItem',
     'DimensionLine',
+    'InteriorReport',
     'StadiaMeasurement',
     'StadiaResult',
     'Observation',

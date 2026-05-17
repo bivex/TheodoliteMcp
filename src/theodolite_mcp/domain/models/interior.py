@@ -30,6 +30,9 @@ class Room(BaseModel):
     number: str
     points: List[Point]
     floor_material: str = "concrete"
+    floor_pattern: Optional[str] = None  # "tiles", "parquet", "planks", "grid"
+    floor_tile_size: Optional[List[float]] = [0.6, 0.6]  # [width, length] in meters
+    floor_angle: float = 0.0  # Rotation of floor pattern
     wall_finish: Optional[str] = None
     ceiling_height: float = 2.7
     tags: List[str] = []
@@ -43,6 +46,7 @@ class FurnitureItem(BaseModel):
     rotation: float = 0.0  # Degrees
     status: str = "new"  # "existing", "new"
     label: Optional[str] = None
+    ergonomics_padding: float = 0.0  # Required clear distance around object
 
 
 class EngineeringItem(BaseModel):
@@ -70,8 +74,18 @@ class InteriorPlan(BaseModel):
     engineering: List[EngineeringItem] = []
     dimensions: List[DimensionLine] = []
     layer: str = "full"  # "full", "furniture", "electrical", "construction"
+    show_ergonomics: bool = False  # Highlight clearance violations
     language: str = "ru"
     paper_format: str = "A4"
     orientation: str = "landscape"
     scale: int = 50  # 1:50 default
     dpi: int = 300
+
+
+class InteriorReport(BaseModel):
+    plan: InteriorPlan
+    tile_counts: dict[str, dict[str, int]] = {}  # room_name -> {total, cut}
+    material_list: list[dict[str, str]] = []
+    furniture_list: list[dict[str, str]] = []
+    ergonomics_warnings: list[str] = []
+    total_area: float = 0.0

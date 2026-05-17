@@ -780,11 +780,28 @@ def draw_interior_plan(
                     number=r.get("number", "1"),
                     points=pts,
                     floor_material=r.get("floor_material", "concrete"),
+                    floor_pattern=r.get("floor_pattern"),
+                    floor_tile_size=r.get("floor_tile_size", [0.6, 0.6]),
+                    floor_angle=r.get("floor_angle", 0.0),
                     wall_finish=r.get("wall_finish"),
                 )
             )
 
-        furniture = [FurnitureItem(**f) for f in furniture_json]
+        furniture = []
+        for f in furniture_json:
+            furniture.append(
+                FurnitureItem(
+                    type=f["type"],
+                    center_pt=Point(**f["center_pt"]),
+                    width=f["width"],
+                    length=f["length"],
+                    rotation=f.get("rotation", 0.0),
+                    status=f.get("status", "new"),
+                    label=f.get("label"),
+                    ergonomics_padding=f.get("ergonomics_padding", 0.0),
+                )
+            )
+
         engineering = [EngineeringItem(**e) for e in engineering_json]
         dimensions = []
         for d in dimensions_json:
@@ -805,6 +822,7 @@ def draw_interior_plan(
             engineering=engineering,
             dimensions=dimensions,
             layer=layer,
+            show_ergonomics=show_ergonomics if "show_ergonomics" in locals() else False,
             language=language,
             paper_format=paper_format,
             scale=scale,
@@ -813,6 +831,37 @@ def draw_interior_plan(
         return Image(data=png_bytes, format="png")
     except Exception as e:
         raise ValueError(f"draw_interior_plan error: {e}") from e
+
+
+@mcp.tool()
+def get_interior_specifications(
+    walls_json: list[dict],
+    rooms_json: list[dict],
+    furniture_json: list[dict] = None,
+) -> dict:
+    """
+    Generates professional specifications: BOM, Tile calculation, and Area report.
+    """
+    try:
+        if furniture_json is None: furniture_json = []
+        
+        walls = []
+        for w in walls_json:
+            openings = [Opening(**op) for op in w.get("openings", [])]
+            walls.append(Wall(**w, openings=openings))
+
+        rooms = []
+        for r in rooms_json:
+            pts = [Point(**p) for p in r.get("points", [])]
+            rooms.append(Room(**r, points=pts))
+
+        furniture = [FurnitureItem(**f) for f in furniture_json]
+
+        plan = InteriorPlan(walls=walls, rooms=rooms, furniture=furniture)
+        report = service.generate_interior_report(plan)
+        return report.model_dump()
+    except Exception as e:
+        raise ValueError(f"get_interior_specifications error: {e}") from e
 
 
 @mcp.tool()

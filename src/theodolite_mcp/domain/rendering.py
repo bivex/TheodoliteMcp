@@ -2698,6 +2698,111 @@ def _draw_chained_dimensions(ax, dimensions: List[DimensionLine], m_per_pt: floa
                     bbox=dict(facecolor="white", edgecolor="none", alpha=0.8, pad=0.1))
 
 
+def _draw_floor_pattern(ax, room: Room, m_per_pt: float = 0.1):
+    """
+    Renders floor textures: tiles, parquet, planks.
+    """
+    if not room.floor_pattern or not room.points:
+        return
+        
+    pts = room.points
+    xs, ys = zip(*[(p.x, p.y) for p in pts])
+    poly = patches.Polygon(list(zip(xs, ys)), closed=True)
+    
+    pat = room.floor_pattern.lower()
+    tw, tl = room.floor_tile_size or [0.6, 0.6]
+    angle = math.radians(room.floor_angle)
+    
+    # Create a grid of lines covering the bounding box
+    x_min, x_max = min(xs), max(xs)
+    y_min, y_max = min(ys), max(ys)
+    
+    # Expand for rotation
+    margin = max(tw, tl) * 2
+    diag = math.hypot(x_max - x_min, y_max - y_min) + margin
+    cx, cy = (x_min + x_max)/2, (y_min + y_max)/2
+    
+    # Basic grid for tiles/planks
+    if pat in ["tiles", "grid", "planks"]:
+        # Vertical lines
+        num_v = int(diag / tw) + 2
+        for i in range(-num_v//2, num_v//2 + 1):
+            lx = i * tw
+            # Line pts in local space
+            p_start = (lx, -diag/2)
+            p_end = (lx, diag/2)
+            # Rotate and translate
+            def rot(px, py):
+                return px*math.cos(angle) - py*math.sin(angle) + cx, \
+                       px*math.sin(angle) + py*math.cos(angle) + cy
+            
+            p1 = rot(*p_start)
+            p2 = rot(*p_end)
+            ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color="#DDDDDD", lw=D/4, zorder=2, clip_path=poly, transform=ax.transData)
+
+        # Horizontal lines
+        num_h = int(diag / tl) + 2
+        for i in range(-num_h//2, num_h//2 + 1):
+            ly = i * tl
+            offset = 0
+            if pat == "planks":
+                # Staggered planks logic could go here, but for simplicity just grid
+                pass
+                
+            p_start = (-diag/2, ly)
+            p_end = (diag/2, ly)
+            p1 = rot(*p_start)
+            p2 = rot(*p_end)
+            ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color="#DDDDDD", lw=D/4, zorder=2, clip_path=poly, transform=ax.transData)
+
+def _calculate_tile_estimate(room: Room) -> Dict[str, int]:
+    """
+    Rough tile estimation: Area based + 15% for cuts.
+    """
+    area = calculate_area(room.points)
+    if not room.floor_tile_size:
+        return {"total": 0, "cut": 0}
+    tile_area = room.floor_tile_size[0] * room.floor_tile_size[1]
+    if tile_area == 0: return {"total": 0, "cut": 0}
+    
+    total_whole = int(area / tile_area)
+    total_with_waste = int(total_whole * 1.15) + 1
+    return {"total": total_with_waste, "whole": total_whole, "cut": total_with_waste - total_whole}
+
+def _draw_ergonomics_warnings(ax, furniture: List[FurnitureItem], walls: List[Wall], m_per_pt: float = 0.1):
+    """
+    Highlights ergonomics violations (too close to walls or other objects).
+    """
+    for item in furniture:
+        pad = getattr(item, "ergonomics_padding", 0.0)
+        if pad <= 0: continue
+        
+        # Draw transparent red circle for padding
+        circle = patches.Circle((item.center_pt.x, item.center_pt.y), 
+                                item.width/2 + pad, 
+                                color="red", alpha=0.1, zorder=1)
+        ax.add_patch(circle)
+        
+        # Simple check against walls
+        for wall in walls:
+            # Distance from point to line segment
+            p = item.center_pt
+            w1, w2 = wall.start_pt, wall.end_pt
+            dx, dy = w2.x - w1.x, w2.y - w1.y
+            l2 = dx*dx + dy*dy
+            if l2 == 0: continue
+            t = max(0, min(1, ((p.x - w1.x) * dx + (p.y - w1.y) * dy) / l2))
+            proj_x = w1.x + t * dx
+            proj_y = w1.y + t * dy
+            dist = math.hypot(p.x - proj_x, p.y - proj_y)
+            
+            if dist < (item.width/2 + pad):
+                # Draw warning arrow
+                ax.annotate("!", xy=(proj_x, proj_y), xytext=(p.x, p.y),
+                            arrowprops=dict(arrowstyle="->", color="red", lw=D),
+                            color="red", fontsize=8, fontweight="bold")
+
+
 def render_interior_plan(plan: InteriorPlan, output_format: str = "png") -> bytes:
     # Ensure hatch linewidth is set for thread safety (constant value)
     matplotlib.rcParams["hatch.linewidth"] = D
@@ -2779,6 +2884,11 @@ def render_interior_plan(plan: InteriorPlan, output_format: str = "png") -> byte
     # Layer: Construction (Walls + Demolition)
     if layer in ["full", "construction"]:
         _draw_walls(ax, plan.walls)
+        
+    # Draw floor patterns for each room
+    if layer in ["full", "furniture"]:
+        for rm in plan.rooms:
+            _draw_floor_pattern(ax, rm, m_per_pt=m_per_pt)
 
     # Layer: Furniture
     if layer in ["full", "furniture"]:
@@ -2790,6 +2900,10 @@ def render_interior_plan(plan: InteriorPlan, output_format: str = "png") -> byte
         
         if plan.furniture:
             _draw_furniture(ax, plan.furniture, m_per_pt=m_per_pt)
+            
+        # Draw Ergonomics (Clearance zones)
+        if getattr(plan, "show_ergonomics", False):
+            _draw_ergonomics_warnings(ax, plan.furniture, plan.walls, m_per_pt=m_per_pt)
 
     # Layer: Engineering (Electrical, Plumbing, HVAC)
     if layer in ["full", "electrical", "engineering"]:

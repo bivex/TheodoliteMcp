@@ -7,13 +7,15 @@ from theodolite_mcp.domain.models import (
     PlotPlan,
     ProfilePlan,
     InteriorPlan,
+    InteriorReport,
     PipelineSchematic,
 )
-from ..domain.logic import calculate_traverse
+from ..domain.logic import calculate_traverse, calculate_area
 from ..domain.rendering import (
     render_plot_plan,
     render_profile_plan,
     render_interior_plan,
+    _calculate_tile_estimate,
 )
 from ..domain.dxf_export import export_plan_to_dxf, export_profile_to_dxf, export_schematic_to_dxf
 from ..domain.dxf_validation import validate_dxf_file, ValidationReport
@@ -68,6 +70,42 @@ class SurveyService:
         return self._save_if_needed(
             render_interior_plan(plan, output_format), output_path
         )
+
+    def generate_interior_report(self, plan: InteriorPlan) -> InteriorReport:
+        """
+        Generates comprehensive designer specifications (BOM, Tile counts, etc.)
+        """
+        report = InteriorReport(plan=plan)
+        total_area = 0.0
+        
+        # 1. Tile calculation
+        for rm in plan.rooms:
+            area = calculate_area(rm.points)
+            total_area += area
+            if rm.floor_pattern:
+                report.tile_counts[rm.name] = _calculate_tile_estimate(rm)
+        
+        report.total_area = total_area
+        
+        # 2. Material List
+        for rm in plan.rooms:
+            report.material_list.append({
+                "room": rm.name,
+                "floor": rm.floor_material,
+                "wall_finish": rm.wall_finish or "None",
+                "area": f"{calculate_area(rm.points):.2f} m²"
+            })
+            
+        # 3. Furniture List
+        for f in plan.furniture:
+            report.furniture_list.append({
+                "type": f.type,
+                "label": f.label or "N/A",
+                "dimensions": f"{f.width}x{f.length} m",
+                "status": f.status
+            })
+            
+        return report
 
     def render_schematic(
         self,
