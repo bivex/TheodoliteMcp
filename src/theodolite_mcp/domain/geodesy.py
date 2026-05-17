@@ -424,7 +424,10 @@ def calculate_grid_convergence(
         1 + 3 * eta2 + 2 * eta2**2
     )
 
-    return math.degrees(gamma)
+    res = math.degrees(gamma)
+    # Normalize to [-180, 180]
+    res = (res + 180) % 360 - 180
+    return res
 
 
 def calculate_point_scale_factor(

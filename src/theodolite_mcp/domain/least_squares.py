@@ -229,9 +229,11 @@ def adjust_network_2d(
                         misc += 360
                     v_list.append(misc)
                 elif obs.type == "fixed_x":
-                    v_list.append(obs.value - curr_coords[obs.from_pt]["x"])
+                    if obs.from_pt in free_pts:
+                        v_list.append(obs.value - curr_coords[obs.from_pt]["x"])
                 elif obs.type == "fixed_y":
-                    v_list.append(obs.value - curr_coords[obs.from_pt]["y"])
+                    if obs.from_pt in free_pts:
+                        v_list.append(obs.value - curr_coords[obs.from_pt]["y"])
             v = np.array(v_list)
             dof = len(v) - 2 * n_free
             sigma0_2 = (v.T @ P @ v) / dof if dof > 0 else 1.0

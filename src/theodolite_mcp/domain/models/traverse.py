@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from .base import Point
 
 class StadiaMeasurement(BaseModel):
@@ -17,6 +17,7 @@ class StadiaResult(BaseModel):
     elevation_diff: float
 
 class Observation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     point_name: str
     horizontal_angle: float  # in decimal degrees
     distance: float = 0.0
