@@ -163,17 +163,19 @@ def _draw_valve_symbol(ax, valve: ValveSymbol, m_per_pt: float, tracker: Optiona
             ax.plot(*zip(*_rot_points(p, cx, cy, ang)), color="black", lw=lw, zorder=6)
 
     if valve.tag:
-        txt, best_pos = valve.tag, _rot(cx, cy + s * 2.2, cx, cy, ang)
+        tag_offset = max(0.6, s * 2.8)
+        txt, best_pos = str(valve.tag), _rot(cx, cy + tag_offset, cx, cy, ang)
         if tracker:
             bbox = tracker.text_bounds(best_pos[0], best_pos[1], txt, 10, m_per_pt, va="bottom")
             if tracker.collides(bbox):
-                best_pos = _rot(cx, cy - s * 2.2, cx, cy, ang)
+                best_pos = _rot(cx, cy - tag_offset, cx, cy, ang)
                 bbox = tracker.text_bounds(best_pos[0], best_pos[1], txt, 10, m_per_pt, va="top")
             tracker.boxes.append(bbox); tracker.draw_debug(ax, bbox, color="green")
         t = ax.text(best_pos[0], best_pos[1], txt, fontproperties=_get_font(10, bold=True, m_per_pt=m_per_pt),
                 ha="center", va="bottom" if best_pos[1] >= cy else "top", color="black", zorder=8,
-                bbox=dict(boxstyle="round,pad=0.05", fc="white", lw=0, alpha=0.8))
+                bbox=dict(boxstyle="round,pad=0.1", fc="white", lw=0, alpha=0.9))
         _add_text_halo(t)
+
 
 def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float, tracker: Optional[LabelTracker] = None):
     cx, cy, w, h, ang, lw, et = eq.center_pt.x, eq.center_pt.y, eq.width, eq.height, eq.rotation, D_SYMBOL, eq.equipment_type
