@@ -256,8 +256,43 @@ def _draw_symbol_legend(fig: Figure, plan: PipelineSchematic, pw_mm: float, ph_m
     items = [("pipe", m, MEDIA_STYLES.get(m, MEDIA_STYLES[PipeMedium.CUSTOM]).get(f"label_{lang}", m), MEDIA_STYLES.get(m)) for m in media]
     if media:
         items.append(("note", "DN", "DN - Номинальный диаметр (мм)" if lang == "ru" else "DN - Nominal Diameter (mm)", None))
-    for v in valves: items.append(("valve", v, v, None))
-    for e in equip: items.append(("equipment", e, e, None))
+    # Add explanations for instrument variables
+    var_map = {
+        "P": ("P - Давление" if lang == "ru" else "P - Pressure"),
+        "T": ("T - Температура" if lang == "ru" else "T - Temperature"),
+        "F": ("F - Расход" if lang == "ru" else "F - Flow"),
+        "L": ("L - Уровень" if lang == "ru" else "L - Level"),
+        "Q": ("Q - Энергия/Тепло" if lang == "ru" else "Q - Energy/Heat"),
+    }
+    vars_used = set()
+    for i in plan.instruments: vars_used.add(i.measured_variable)
+    # Also equipment can have internal letters
+    for e in plan.equipment:
+        if e.equipment_type == EquipmentType.PRESSURE_GAUGE: vars_used.add("P")
+        if e.equipment_type == EquipmentType.THERMOMETER: vars_used.add("T")
+        if e.equipment_type == EquipmentType.FLOW_METER: vars_used.add("F")
+        if e.equipment_type == EquipmentType.HEAT_METER: vars_used.add("Q")
+    
+    for v in sorted(list(vars_used)):
+        if v in var_map:
+            items.append(("note", v, var_map[v], None))
+
+    for v in valves:
+        label = v.replace("_", " ").title()
+        if lang == "ru":
+            ru_v = {"check": "Клапан обр.", "ball": "Кран шар.", "gate": "Задвижка", "butterfly": "Затвор", "globe": "Вентиль", 
+                    "3way_mixing": "Кран 3-ход.", "prv": "Редуктор давл.", "safety": "Клапан пред."}
+            label = ru_v.get(v, label)
+        items.append(("valve", v, label, None))
+
+    for e in equip:
+        label = e.replace("_", " ").title()
+        if lang == "ru":
+            ru_e = {"boiler": "Котел", "centrifugal_pump": "Насос", "expansion_vessel": "Бак ГА", "mesh_filter": "Фильтр", 
+                    "storage_tank": "Резервуар", "pressure_gauge": "Манометр", "thermometer": "Термометр", 
+                    "flow_meter": "Расходомер", "heat_meter": "Теплосчетчик"}
+            label = ru_e.get(e, label)
+        items.append(("equipment", e, label, None))
     if instr: items.append(("instrument", "iso3511", "КИПиА" if lang == "ru" else "P&ID", None))
     if not items: return
     row_h, legend_w = 12.0, 90.0
