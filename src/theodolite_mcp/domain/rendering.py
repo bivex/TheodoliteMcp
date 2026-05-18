@@ -815,6 +815,8 @@ def _auto_color(index: int) -> str:
 
 
 def _polygon_coords(points: List[Point]) -> Tuple[List[float], List[float]]:
+    if not points:
+        return [], []
     xs = [p.x for p in points]
     ys = [p.y for p in points]
     xs.append(points[0].x)
@@ -3177,7 +3179,8 @@ def render_plot_plan(plan: PlotPlan, output_format: str = "png") -> bytes:
     if getattr(plan, "security", None):
         _draw_security(ax, plan.security, m_per_pt=m_per_pt)
 
-    _draw_boundary(ax, plan.boundary_points, standard=plan.standard)
+    if plan.boundary_points:
+        _draw_boundary(ax, plan.boundary_points, standard=plan.standard)
 
     if plan.show_vertex_labels:
         _draw_vertex_labels(
