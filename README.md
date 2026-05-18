@@ -26,6 +26,12 @@ A professional-grade MCP server for engineering, surveying, and architectural au
     <td><img src="screenshots/longitudinal_profile.png" width="400"/></td>
     <td><img src="screenshots/as_built_report.png" width="400"/></td>
   </tr>
+  <tr>
+    <td align="center" colspan="2"><b>Water Supply with Boiler (P&ID)</b></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="screenshots/water_supply_boiler.png" width="400"/></td>
+  </tr>
 </table>
 
 ---
