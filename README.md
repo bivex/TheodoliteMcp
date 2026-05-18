@@ -7,6 +7,29 @@ A professional-grade MCP server for engineering, surveying, and architectural au
 
 ---
 
+## 📸 Output Examples
+
+<table>
+  <tr>
+    <td align="center"><b>Cadastral Plan</b></td>
+    <td align="center"><b>Interior Floor Plan</b></td>
+  </tr>
+  <tr>
+    <td><img src="screenshots/plot_plan.png" width="400"/></td>
+    <td><img src="screenshots/interior_plan.png" width="400"/></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Longitudinal Profile</b></td>
+    <td align="center"><b>As-Built Report</b></td>
+  </tr>
+  <tr>
+    <td><img src="screenshots/longitudinal_profile.png" width="400"/></td>
+    <td><img src="screenshots/as_built_report.png" width="400"/></td>
+  </tr>
+</table>
+
+---
+
 ## 🌟 Core Capabilities
 
 - **Expert P&ID Schematics:** ISO 6412/14617 compliant pipeline diagrams with smart collision detection and expert-grade auto-scaling.
@@ -27,6 +50,7 @@ A professional-grade MCP server for engineering, surveying, and architectural au
 - `docs/gallery/` - Visual examples of generated ISO-compliant plans.
 - `tests/` - Robust unit test suite covering edge cases and pixel-perfect rendering.
 - `output/` - Default directory for generated PNG, SVG, and DXF files.
+- `screenshots/` - Example outputs for all 4 drawing types.
 
 ---
 
