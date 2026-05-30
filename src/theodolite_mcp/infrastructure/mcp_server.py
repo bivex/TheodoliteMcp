@@ -1337,11 +1337,77 @@ def reverse_azimuth(
         raise ValueError(f"reverse_azimuth error: {e}") from e
 
 
-if __name__ == "__main__":
-    mcp.run()
-
-
 # ========== SVG EXPORT TOOLS ==========
+
+
+@mcp.tool()
+def draw_construction_as_built_report_svg(
+    title: Annotated[
+        str, Field(default="As-Built Survey Report", description="Report title")
+    ] = "As-Built Survey Report",
+    as_built_points_json: Annotated[
+        Optional[list[dict]],
+        Field(
+            default=None,
+            description="List of as-built survey points with design vs. as-built coordinates",
+        ),
+    ] = None,
+    volume_grid_json: Annotated[
+        Optional[dict],
+        Field(
+            default=None,
+            description="Optional volume grid data for earthwork calculation",
+        ),
+    ] = None,
+    language: Annotated[
+        str,
+        Field(
+            default="ru",
+            description="Drawing language: 'ru' (Russian) or 'en' (English)",
+        ),
+    ] = "ru",
+    paper_format: Annotated[
+        str, Field(default="A3", description="Paper size: A0, A1, A2, A3, A4, etc.")
+    ] = "A3",
+    output_path: Annotated[
+        Optional[str],
+        Field(default=None, description="Optional file path to save SVG output"),
+    ] = None,
+) -> str:
+    """
+    Generates a construction report in SVG format showing deviations (plan/fact) and earthwork volumes.
+    Returns the SVG XML string. Optionally saves to file if output_path provided.
+    """
+    try:
+        if as_built_points_json is None:
+            as_built_points_json = []
+        pts = [AsBuiltPoint(**p) for p in as_built_points_json]
+
+        v_grid = None
+        if volume_grid_json:
+            cells = [GridCell(**c) for c in volume_grid_json.get("cells", [])]
+            v_grid = VolumeGrid(
+                title=volume_grid_json.get("title", "Volume Grid"),
+                cells=cells,
+                total_cut=volume_grid_json.get("total_cut", 0),
+                total_fill=volume_grid_json.get("total_fill", 0),
+                net_volume=volume_grid_json.get("net_volume", 0),
+            )
+
+        plan = PlotPlan(
+            title=title,
+            boundary_points=[],
+            as_built_points=pts,
+            volume_grid=v_grid,
+            language=language,
+            paper_format=paper_format,
+        )
+        svg_bytes = service.render_plot(
+            plan, output_path=output_path, output_format="svg"
+        )
+        return svg_bytes.decode("utf-8")
+    except Exception as e:
+        raise ValueError(f"draw_construction_as_built_report_svg error: {e}") from e
 
 
 @mcp.tool()
@@ -2096,6 +2162,117 @@ def draw_pipeline_schematic_svg(
 
 
 @mcp.tool()
+def draw_heating_system_svg(
+    boiler_label: Annotated[str, Field(default="Coal Boiler", description="Label for the boiler")] = "Coal Boiler",
+    radiator_count: Annotated[int, Field(default=3, description="Number of radiators to connect")] = 3,
+    title: Annotated[str, Field(default="Heating System Schematic", description="Drawing title")] = "Heating System Schematic",
+    language: Annotated[str, Field(default="ru", description="Language: 'ru' or 'en'")] = "ru",
+    output_path: Annotated[Optional[str], Field(default=None, description="Optional file path to save SVG output")] = None,
+) -> str:
+    """
+    Automatically generates a professional heating system schematic in SVG format (ISO 6412/14617).
+    Connects one boiler to multiple radiators via supply and return manifolds.
+    Includes pumps, safety valves, expansion vessel, and instrumentation.
+    Returns the SVG XML string. Optionally saves to file if output_path provided.
+    """
+    try:
+        from theodolite_mcp.domain.models.schematic import (
+            PipelineSchematic, PipeSegment, EquipmentSymbol, ValveSymbol,
+            EquipmentType, ValveType, PipeMedium, InstrumentSymbol
+        )
+
+        labels = {
+            "en": {"pump": "Heating Pump", "s_manifold": "Supply Manifold", "r_manifold": "Return Manifold"},
+            "uk": {"pump": "Циркуляційний насос", "s_manifold": "Подаючий колектор", "r_manifold": "Зворотній колектор"},
+            "ru": {"pump": "Циркуляционный насос", "s_manifold": "Подающий коллектор", "r_manifold": "Обратный коллектор"},
+        }
+        l = labels.get(language, labels["en"])
+
+        pipes, equipment, valves, instruments = [], [], [], []
+
+        equipment.append(EquipmentSymbol(
+            center_pt=Point(x=2, y=8),
+            equipment_type=EquipmentType.BOILER,
+            tag="B1", label=boiler_label, width=2.0, height=3.0
+        ))
+
+        pipes.append(PipeSegment(start_pt=Point(x=3, y=9.5), end_pt=Point(x=8, y=9.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=32))
+        valves.append(ValveSymbol(center_pt=Point(x=4, y=9.5), valve_type=ValveType.BALL, tag="V1"))
+
+        pipes.append(PipeSegment(start_pt=Point(x=5, y=9.5), end_pt=Point(x=5, y=10.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=20))
+        valves.append(ValveSymbol(center_pt=Point(x=5, y=10.5), valve_type=ValveType.SAFETY_RELIEF, tag="PRV1"))
+        pipes.append(PipeSegment(start_pt=Point(x=5, y=10.5), end_pt=Point(x=5, y=9.0), medium=PipeMedium.DRAINAGE, nominal_diameter=15))
+
+        instruments.append(InstrumentSymbol(center_pt=Point(x=6, y=10.5), measured_variable="P", tag_number="01"))
+        pipes.append(PipeSegment(start_pt=Point(x=6, y=9.5), end_pt=Point(x=6, y=10.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=15))
+
+        m_width = max(3.0, radiator_count * 1.5)
+        equipment.append(EquipmentSymbol(
+            center_pt=Point(x=12, y=9.5),
+            equipment_type=EquipmentType.MANIFOLD,
+            tag=f"M1 - {l['s_manifold']}", width=m_width, height=0.6
+        ))
+
+        pipes.append(PipeSegment(start_pt=Point(x=12 + m_width/2, y=9.5), end_pt=Point(x=12 + m_width/2, y=10.5), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=15))
+        instruments.append(InstrumentSymbol(center_pt=Point(x=12 + m_width/2, y=10.5), measured_variable="L", suffix="A", tag_number="01"))
+
+        equipment.append(EquipmentSymbol(
+            center_pt=Point(x=12, y=4.5),
+            equipment_type=EquipmentType.MANIFOLD,
+            tag=f"M2 - {l['r_manifold']}", width=m_width, height=0.6
+        ))
+
+        m_start_x = 12 - m_width/2 + 0.75
+        for i in range(radiator_count):
+            rx = m_start_x + i * 1.5
+            equipment.append(EquipmentSymbol(
+                center_pt=Point(x=rx, y=7),
+                equipment_type=EquipmentType.RADIATOR,
+                tag=f"R{i+1}", width=1.0, height=0.8
+            ))
+            pipes.append(PipeSegment(start_pt=Point(x=rx + 0.4, y=7.4), end_pt=Point(x=rx + 0.4, y=7.8), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=15))
+            instruments.append(InstrumentSymbol(center_pt=Point(x=rx + 0.4, y=7.8), measured_variable="L", suffix="M", tag_number=f"{i+1}"))
+            pipes.append(PipeSegment(start_pt=Point(x=rx, y=9.2), end_pt=Point(x=rx, y=7.4), medium=PipeMedium.HEATING_SUPPLY, nominal_diameter=20))
+            valves.append(ValveSymbol(center_pt=Point(x=rx, y=8.5), valve_type=ValveType.GLOBE, tag=f"VR{i+1}s"))
+            pipes.append(PipeSegment(start_pt=Point(x=rx, y=6.6), end_pt=Point(x=rx, y=4.8), medium=PipeMedium.HEATING_RETURN, nominal_diameter=20))
+            valves.append(ValveSymbol(center_pt=Point(x=rx, y=5.5), valve_type=ValveType.BALL, tag=f"VR{i+1}r"))
+
+        pipes.append(PipeSegment(start_pt=Point(x=12 - m_width/2, y=4.5), end_pt=Point(x=3, y=4.5), medium=PipeMedium.HEATING_RETURN, nominal_diameter=32))
+
+        equipment.append(EquipmentSymbol(
+            center_pt=Point(x=6, y=4.5),
+            equipment_type=EquipmentType.CIRCULATION_PUMP,
+            tag="PU1", label=l["pump"], width=0.8, height=0.8
+        ))
+        valves.append(ValveSymbol(center_pt=Point(x=5, y=4.5), valve_type=ValveType.BALL, tag="V2"))
+        valves.append(ValveSymbol(center_pt=Point(x=7, y=4.5), valve_type=ValveType.BALL, tag="V3"))
+
+        pipes.append(PipeSegment(start_pt=Point(x=8, y=4.5), end_pt=Point(x=8, y=3.0), medium=PipeMedium.HEATING_RETURN, nominal_diameter=20))
+        equipment.append(EquipmentSymbol(
+            center_pt=Point(x=8, y=2.5),
+            equipment_type=EquipmentType.EXPANSION_VESSEL,
+            tag="GA1", width=1.0, height=1.2
+        ))
+
+        pipes.append(PipeSegment(start_pt=Point(x=4, y=4.5), end_pt=Point(x=4, y=3.5), medium=PipeMedium.HEATING_RETURN, nominal_diameter=15))
+        valves.append(ValveSymbol(center_pt=Point(x=4, y=3.5), valve_type=ValveType.BALL, tag="V-Drain"))
+
+        pipes.append(PipeSegment(start_pt=Point(x=3, y=4.5), end_pt=Point(x=3, y=6.5), medium=PipeMedium.HEATING_RETURN, nominal_diameter=32))
+        valves.append(ValveSymbol(center_pt=Point(x=3, y=5.5), valve_type=ValveType.BALL, tag="V4"))
+
+        plan = PipelineSchematic(
+            title=title, pipes=pipes, equipment=equipment,
+            valves=valves, instruments=instruments, language=language
+        )
+        svg_bytes = service.render_schematic(
+            plan, output_path=output_path, output_format="svg"
+        )
+        return svg_bytes.decode("utf-8")
+    except Exception as e:
+        raise ValueError(f"draw_heating_system_svg error: {e}") from e
+
+
+@mcp.tool()
 def mcp_export_schematic_to_dxf(
     title: Annotated[
         str,
@@ -2169,3 +2346,7 @@ def mcp_export_schematic_to_dxf(
         return service.export_schematic_dxf(plan, output_path)
     except Exception as e:
         raise ValueError(f"mcp_export_schematic_to_dxf error: {e}") from e
+
+
+if __name__ == "__main__":
+    mcp.run()
