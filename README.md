@@ -38,6 +38,7 @@ A professional-grade MCP server for engineering, surveying, and architectural au
 
 ## 🌟 Core Capabilities
 
+- **Professional Engineering Rendering:** High-fidelity PNG and **Scalable Vector Graphics (SVG)** output with searchable text, ISO-compliant line weights, and perfect scaling.
 - **Expert P&ID Schematics:** ISO 6412/14617 compliant pipeline diagrams with smart collision detection and expert-grade auto-scaling.
 - **Precision Surveying:** Automated Bowditch (Compass Rule) and **Least Squares Adjustment (LSA)** for surveying networks.
 - **Infrastructure Engineering:** Longitudinal profiles for pipelines and roads with vertical exaggeration and auto-calculated slope tables ("podvals").
@@ -63,11 +64,11 @@ A professional-grade MCP server for engineering, surveying, and architectural au
 ## 🛠 Available MCP Tools
 
 ### 🖋 Expert Engineering Rendering (PNG/SVG)
-- **`draw_pipeline_schematic`**: Generates ISO 6412/14617 pipeline diagrams (P&ID). Features expert-grade label placement, text halos, and dynamic symbol legends.
-- **`draw_interior_plan`**: Generates architectural floor plans with walls, openings, and furniture.
-- **`draw_plot_plan`**: Generates ISO-compliant cadastral, topographic, and site plans.
-- **`draw_longitudinal_profile`**: Generates engineering profiles with auto-calculated slope/depth tables.
-- **`draw_construction_as_built_report`**: Generates deviation schemes and earthwork volume plans.
+- **`draw_pipeline_schematic`** & **`draw_pipeline_schematic_svg`**: Generates ISO 6412/14617 pipeline diagrams (P&ID). Features expert-grade label placement, text halos, and dynamic symbol legends.
+- **`draw_interior_plan`** & **`draw_interior_plan_svg`**: Generates architectural floor plans with walls, openings, and furniture.
+- **`draw_plot_plan`** & **`draw_plot_plan_svg`**: Generates ISO-compliant cadastral, topographic, and site plans.
+- **`draw_longitudinal_profile`** & **`draw_longitudinal_profile_svg`**: Generates engineering profiles with auto-calculated slope/depth tables.
+- **`draw_construction_as_built_report`** & **`draw_construction_as_built_report_svg`**: Generates deviation schemes and earthwork volume plans.
 
 ### 📂 CAD Interoperability (DXF)
 - **`export_to_dxf`**: Exports any PlotPlan to a multi-layered AutoCAD-compatible file.
