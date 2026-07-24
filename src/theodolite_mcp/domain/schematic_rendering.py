@@ -57,29 +57,168 @@ def _add_text_halo(text_obj):
     """Add a white outline to text to make it readable over lines."""
     text_obj.set_path_effects([path_effects.withStroke(linewidth=3, foreground="white", alpha=0.8)])
 
+# ---------------------------------------------------------------------------
+# Smart auto-routing label placement
+# ---------------------------------------------------------------------------
+# Candidate directions: 8 compass directions (angle in degrees from +X axis)
+_CANDIDATE_ANGLES = [90, 270, 0, 180, 45, 135, 225, 315]
+# Multipliers for candidate distances (relative to base_offset)
+_CANDIDATE_DIST_MULT = [1.0, 1.6, 2.4]
+
+
 class LabelTracker:
-    """Advanced rectangle-based collision tracker for label placement."""
+    """Smart label auto-router with multi-obstacle awareness.
+
+    Obstacles registered:
+      - Pipe segments (as thick AABBs with padding)
+      - Equipment/valve bounding boxes
+      - Already-placed label boxes
+
+    Candidate generation:
+      - 8 directions × 3 distances  → up to 24 candidates per label
+      - Scored by: collision_count * PENALTY + distance_from_ideal * WEIGHT
+      - Best-scoring candidate wins; a thin leader line is drawn when the
+        label is displaced more than 1.5× the base offset.
+    """
+
+    COLLISION_PENALTY = 100.0   # cost per overlapping existing obstacle
+    DISTANCE_WEIGHT   = 1.0    # cost per unit distance from ideal position
+    LEADER_THRESHOLD  = 1.5    # ratio beyond which a leader line is drawn
+
     def __init__(self, debug: bool = False):
-        self.boxes: List[Tuple[float, float, float, float]] = []
+        self.boxes: List[Tuple[float, float, float, float]] = []  # placed labels + obstacles
+        self.obstacles: List[Tuple[float, float, float, float]] = []  # non-label obstacles only
         self.debug = debug
 
-    def text_bounds(self, x: float, y: float, text: str, fontsize: float, m_per_pt: float, ha="center", va="center") -> Tuple[float, float, float, float]:
+    # ------------------------------------------------------------------
+    # Obstacle registration
+    # ------------------------------------------------------------------
+    def register_segment(self, x1: float, y1: float, x2: float, y2: float, half_w: float = 0.15):
+        """Register a pipe segment as a fat rectangular obstacle."""
+        # Expand segment to an AABB with padding
+        bx1, bx2 = min(x1, x2) - half_w, max(x1, x2) + half_w
+        by1, by2 = min(y1, y2) - half_w, max(y1, y2) + half_w
+        box = (bx1, by1, bx2, by2)
+        self.obstacles.append(box)
+        self.boxes.append(box)
+
+    def register_symbol(self, cx: float, cy: float, radius: float):
+        """Register a circular symbol as a square AABB obstacle."""
+        r = radius + 0.1
+        box = (cx - r, cy - r, cx + r, cy + r)
+        self.obstacles.append(box)
+        self.boxes.append(box)
+
+    # ------------------------------------------------------------------
+    # Bounding box helpers
+    # ------------------------------------------------------------------
+    def text_bounds(
+        self, x: float, y: float, text: str, fontsize: float, m_per_pt: float,
+        ha: str = "center", va: str = "center"
+    ) -> Tuple[float, float, float, float]:
         char_w = fontsize * 0.7 * MM_TO_PT * m_per_pt
         char_h = fontsize * 1.3 * MM_TO_PT * m_per_pt
         lines = str(text).split("\n")
         max_len = max(len(line) for line in lines) if lines else 1
         w, h = max_len * char_w, len(lines) * char_h
-        x1 = x if ha == "left" else (x - w if ha == "right" else x - w/2)
-        y1 = y if va == "bottom" else (y - h if va == "top" else y - h/2)
-        return (x1 - 0.2, y1 - 0.2, x1 + w + 0.2, y1 + h + 0.2)
+        x1 = x if ha == "left" else (x - w if ha == "right" else x - w / 2)
+        y1 = y if va == "bottom" else (y - h if va == "top" else y - h / 2)
+        return (x1 - 0.15, y1 - 0.15, x1 + w + 0.15, y1 + h + 0.15)
+
+    # ------------------------------------------------------------------
+    # Collision scoring
+    # ------------------------------------------------------------------
+    def _count_collisions(self, box: Tuple[float, float, float, float]) -> int:
+        x1, y1, x2, y2 = box
+        n = 0
+        for bx1, by1, bx2, by2 in self.boxes:
+            if not (x2 < bx1 or x1 > bx2 or y2 < by1 or y1 > by2):
+                n += 1
+        return n
 
     def collides(self, box: Tuple[float, float, float, float]) -> bool:
-        x1, y1, x2, y2 = box
-        for bx1, by1, bx2, by2 in self.boxes:
-            if not (x2 < bx1 or x1 > bx2 or y2 < by1 or y1 > by2): return True
-        return False
+        return self._count_collisions(box) > 0
 
-    def draw_debug(self, ax, box: Tuple[float, float, float, float], color="red"):
+    # ------------------------------------------------------------------
+    # Smart placement
+    # ------------------------------------------------------------------
+    def best_label_position(
+        self,
+        anchor_x: float, anchor_y: float,
+        text: str, fontsize: float, m_per_pt: float,
+        base_offset: float,
+        ideal_angle_deg: float = 90.0,
+        ha: str = "center", va: str = "center",
+    ) -> Tuple[float, float, float, Tuple[float, float, float, float]]:
+        """Find best label position using multi-candidate scoring.
+
+        Returns: (best_x, best_y, best_score, best_bbox)
+        """
+        best_x, best_y, best_score, best_bbox = anchor_x, anchor_y + base_offset, 1e9, None
+
+        # Try each angle × distance combination
+        for ang in _CANDIDATE_ANGLES:
+            rad = math.radians(ang)
+            ux, uy = math.cos(rad), math.sin(rad)
+            for dm in _CANDIDATE_DIST_MULT:
+                d = base_offset * dm
+                cx, cy = anchor_x + ux * d, anchor_y + uy * d
+                bbox = self.text_bounds(cx, cy, text, fontsize, m_per_pt, ha=ha, va=va)
+                n_coll = self._count_collisions(bbox)
+                # Distance penalty: prefer angles close to the ideal
+                ang_delta = abs(((ang - ideal_angle_deg) + 180) % 360 - 180)
+                dist_cost = d * self.DISTANCE_WEIGHT + ang_delta * 0.02
+                score = n_coll * self.COLLISION_PENALTY + dist_cost
+                if score < best_score:
+                    best_score = score
+                    best_x, best_y, best_bbox = cx, cy, bbox
+
+        if best_bbox is None:
+            best_bbox = self.text_bounds(best_x, best_y, text, fontsize, m_per_pt, ha=ha, va=va)
+
+        return best_x, best_y, best_score, best_bbox
+
+    def place_label(
+        self,
+        ax,
+        anchor_x: float, anchor_y: float,
+        text: str, fontsize: float, m_per_pt: float,
+        base_offset: float,
+        ideal_angle_deg: float = 90.0,
+        ha: str = "center", va: str = "center",
+        color: str = "black",
+        bold: bool = False,
+        zorder: int = 8,
+        bbox_style: Optional[dict] = None,
+        draw_leader: bool = True,
+        leader_color: str = "#888888",
+    ) -> object:
+        """Place label at the best collision-free position and optionally draw a leader line."""
+        bx, by, score, bbox = self.best_label_position(
+            anchor_x, anchor_y, text, fontsize, m_per_pt,
+            base_offset, ideal_angle_deg, ha, va,
+        )
+        # Draw leader line if label was displaced significantly
+        displaced = math.hypot(bx - anchor_x, by - anchor_y)
+        if draw_leader and displaced > base_offset * self.LEADER_THRESHOLD:
+            ax.plot(
+                [anchor_x, bx], [anchor_y, by],
+                color=leader_color, lw=0.5, ls="--", zorder=zorder - 1, alpha=0.7
+            )
+
+        t = ax.text(
+            bx, by, text,
+            fontproperties=_get_font(fontsize, bold=bold, m_per_pt=m_per_pt),
+            ha=ha, va=va, color=color, zorder=zorder,
+            **(dict(bbox=bbox_style) if bbox_style else {}),
+        )
+        self.boxes.append(bbox)
+        if self.debug:
+            x1, y1, x2, y2 = bbox
+            ax.add_patch(Rectangle((x1, y1), x2-x1, y2-y1, fill=False, ec="magenta", lw=0.4, alpha=0.6, ls=":", zorder=20))
+        return t
+
+    def draw_debug(self, ax, box: Tuple[float, float, float, float], color: str = "red"):
         if self.debug:
             x1, y1, x2, y2 = box
             ax.add_patch(Rectangle((x1, y1), x2-x1, y2-y1, fill=False, ec=color, lw=0.5, alpha=0.5, ls="--", zorder=20))
@@ -101,11 +240,15 @@ def _draw_pipe_segment(ax, pipe: PipeSegment, m_per_pt: float, tracker: Optional
     color, lw = pipe.custom_color or style["color"], _dn_lw(pipe.nominal_diameter)
     x1, y1, x2, y2 = pipe.start_pt.x, pipe.start_pt.y, pipe.end_pt.x, pipe.end_pt.y
     ax.plot([x1, x2], [y1, y2], color=color, linestyle=style["ls"], linewidth=lw, solid_capstyle="round", zorder=2)
-    
+
+    # Register pipe as obstacle for later label placement
+    if tracker:
+        tracker.register_segment(x1, y1, x2, y2, half_w=0.12)
+
     if pipe.flow_direction != "none" and (x1 != x2 or y1 != y2):
         dx, dy = x2 - x1, y2 - y1
         seg_len = math.hypot(dx, dy)
-        arrow_size = min(seg_len * 0.15, 0.3) 
+        arrow_size = min(seg_len * 0.15, 0.3)
         if pipe.flow_direction == "backward": dx, dy = -dx, -dy
         mx, my, ux, uy = (x1 + x2) / 2, (y1 + y2) / 2, dx / seg_len, dy / seg_len
         tip = (mx + ux * arrow_size, my + uy * arrow_size)
@@ -115,18 +258,24 @@ def _draw_pipe_segment(ax, pipe: PipeSegment, m_per_pt: float, tracker: Optional
         ax.add_patch(Polygon([tip, base1, base2], closed=True, fc=color, ec=color, zorder=3))
 
     if pipe.show_dn_label and math.hypot(x2 - x1, y2 - y1) > 0.4:
-        mx, my, seg_len = (x1 + x2) / 2, (y1 + y2) / 2, math.hypot(x2 - x1, y2 - y1)
-        nx, ny = -(y2-y1)/seg_len, (x2-x1)/seg_len
+        mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+        seg_len = math.hypot(x2 - x1, y2 - y1)
+        # Perpendicular direction angle for ideal label placement
+        pipe_ang = math.degrees(math.atan2(y2 - y1, x2 - x1))
+        ideal_ang = pipe_ang + 90.0
         txt = f"DN{pipe.nominal_diameter}"
-        offset = 0.5 
-        best_pos = (mx + nx * offset, my + ny * offset)
         if tracker:
-            bbox = tracker.text_bounds(best_pos[0], best_pos[1], txt, 8, m_per_pt)
-            if tracker.collides(bbox):
-                best_pos = (mx - nx * offset, my - ny * offset)
-                bbox = tracker.text_bounds(best_pos[0], best_pos[1], txt, 8, m_per_pt)
-            tracker.boxes.append(bbox); tracker.draw_debug(ax, bbox, color="blue")
-        t = ax.text(best_pos[0], best_pos[1], txt, fontproperties=_get_font(8, m_per_pt=m_per_pt), ha="center", va="center", color=color, zorder=5)
+            t = tracker.place_label(
+                ax, mx, my, txt, 8, m_per_pt,
+                base_offset=0.5, ideal_angle_deg=ideal_ang,
+                ha="center", va="center", color=color, zorder=5,
+                draw_leader=False,  # DN labels don't need leader lines
+            )
+        else:
+            nx, ny = -(y2 - y1) / seg_len, (x2 - x1) / seg_len
+            t = ax.text(mx + nx * 0.5, my + ny * 0.5, txt,
+                        fontproperties=_get_font(8, m_per_pt=m_per_pt),
+                        ha="center", va="center", color=color, zorder=5)
         _add_text_halo(t)
 
 def _draw_valve_symbol(ax, valve: ValveSymbol, m_per_pt: float, tracker: Optional[LabelTracker] = None):
@@ -162,94 +311,133 @@ def _draw_valve_symbol(ax, valve: ValveSymbol, m_per_pt: float, tracker: Optiona
         for p in [([-s*0.6, -s*0.4], [0,0], [-s*0.6, s*0.4]), ([s*0.6, -s*0.4], [0,0], [s*0.6, s*0.4])]:
             ax.plot(*zip(*_rot_points(p, cx, cy, ang)), color="black", lw=lw, zorder=6)
 
+    # Register symbol footprint as obstacle before label placement
+    if tracker:
+        tracker.register_symbol(cx, cy, s)
+
     if valve.tag:
         tag_offset = max(0.6, s * 2.8)
-        txt, best_pos = str(valve.tag), _rot(cx, cy + tag_offset, cx, cy, ang)
+        txt = str(valve.tag)
         if tracker:
-            bbox = tracker.text_bounds(best_pos[0], best_pos[1], txt, 10, m_per_pt, va="bottom")
-            if tracker.collides(bbox):
-                best_pos = _rot(cx, cy - tag_offset, cx, cy, ang)
-                bbox = tracker.text_bounds(best_pos[0], best_pos[1], txt, 10, m_per_pt, va="top")
-            tracker.boxes.append(bbox); tracker.draw_debug(ax, bbox, color="green")
-        t = ax.text(best_pos[0], best_pos[1], txt, fontproperties=_get_font(10, bold=True, m_per_pt=m_per_pt),
-                ha="center", va="bottom" if best_pos[1] >= cy else "top", color="black", zorder=8,
-                bbox=dict(boxstyle="round,pad=0.1", fc="white", lw=0, alpha=0.9))
+            t = tracker.place_label(
+                ax, cx, cy, txt, 10, m_per_pt,
+                base_offset=tag_offset, ideal_angle_deg=ang + 90,
+                ha="center", va="center", color="black", bold=True, zorder=8,
+                bbox_style=dict(boxstyle="round,pad=0.1", fc="white", lw=0, alpha=0.9),
+                draw_leader=True,
+            )
+        else:
+            best_pos = _rot(cx, cy + tag_offset, cx, cy, ang)
+            t = ax.text(best_pos[0], best_pos[1], txt,
+                        fontproperties=_get_font(10, bold=True, m_per_pt=m_per_pt),
+                        ha="center", va="bottom", color="black", zorder=8,
+                        bbox=dict(boxstyle="round,pad=0.1", fc="white", lw=0, alpha=0.9))
         _add_text_halo(t)
 
 
 def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float, tracker: Optional[LabelTracker] = None):
-    cx, cy, w, h, ang, lw, et = eq.center_pt.x, eq.center_pt.y, eq.width, eq.height, eq.rotation, D_SYMBOL, eq.equipment_type
-    if w >= 8: lw = D_SYMBOL * 2.5
+    cx, cy = eq.center_pt.x, eq.center_pt.y
+    w, h, ang, lw, et = eq.width, eq.height, eq.rotation, D_SYMBOL, eq.equipment_type
+    if w >= 8:
+        lw = D_SYMBOL * 2.5
     hw, hh = w / 2, h / 2
+
     if et in (EquipmentType.CENTRIFUGAL_PUMP, EquipmentType.CIRCULATION_PUMP):
         r = min(w, h) / 2
         ax.add_patch(Circle((cx, cy), r, fill=False, ec="black", lw=lw, zorder=6))
-        ax.add_patch(Polygon(_rot_points([(r, 0), (-r*0.5, r*0.86), (-r*0.5, -r*0.86)], cx, cy, ang), closed=True, fc="black", ec="black", zorder=7))
-    elif et in (EquipmentType.BOILER, EquipmentType.SHELL_TUBE_HX, EquipmentType.PLATE_HX, EquipmentType.STORAGE_TANK):
+        ax.add_patch(Polygon(_rot_points([(r, 0), (-r*0.5, r*0.86), (-r*0.5, -r*0.86)], cx, cy, ang),
+                             closed=True, fc="black", ec="black", zorder=7))
+    elif et in (EquipmentType.BOILER, EquipmentType.SHELL_TUBE_HX,
+                EquipmentType.PLATE_HX, EquipmentType.STORAGE_TANK):
         rect_pts = _rot_points([(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)], cx, cy, ang)
         ax.plot(*zip(*(rect_pts + [rect_pts[0]])), color="black", lw=D_WIDE, zorder=6)
         if et == EquipmentType.BOILER:
             for i in range(3):
                 yy, wave = -hh * 0.5 + i * hh * 0.5, []
-                for t in range(21): wave.append(_rot(cx - hw * 0.6 + t * hw * 0.06, cy + yy + math.sin(t * 0.6) * hh * 0.15, cx, cy, ang))
+                for t in range(21):
+                    wave.append(_rot(cx - hw * 0.6 + t * hw * 0.06,
+                                     cy + yy + math.sin(t * 0.6) * hh * 0.15, cx, cy, ang))
                 ax.plot(*zip(*wave), color="#CC4400", lw=D*1.5, zorder=7)
         elif et == EquipmentType.STORAGE_TANK:
             arc_pts = []
             for t in range(11):
                 angle = math.pi + t * math.pi / 10
-                arc_pts.append(_rot(cx + hw * 0.8 * math.cos(angle), cy - hh + hh * 0.15 * math.sin(angle) - hh * 0.1, cx, cy, ang))
+                arc_pts.append(_rot(cx + hw * 0.8 * math.cos(angle),
+                                    cy - hh + hh * 0.15 * math.sin(angle) - hh * 0.1, cx, cy, ang))
             ax.plot(*zip(*arc_pts), color="black", lw=D, zorder=7)
     elif et == EquipmentType.RADIATOR:
         rect_pts = _rot_points([(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)], cx, cy, ang)
         ax.plot(*zip(*(rect_pts + [rect_pts[0]])), color="black", lw=D_WIDE, zorder=6)
-        # Fins for radiator
         fins = 5
         for i in range(fins):
-            off = -hw + (i+1) * (2*hw / (fins+1))
+            off = -hw + (i + 1) * (2 * hw / (fins + 1))
             ax.plot(*zip(*_rot_points([(off, -hh), (off, hh)], cx, cy, ang)), color="black", lw=D, zorder=7)
     elif et == EquipmentType.MANIFOLD:
         rect_pts = _rot_points([(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)], cx, cy, ang)
         ax.fill(*zip(*rect_pts), color="#EEEEEE", alpha=0.5, zorder=5)
         ax.plot(*zip(*(rect_pts + [rect_pts[0]])), color="black", lw=D_WIDE, zorder=6)
-        # Ports for manifold
         ports = 4
         for i in range(ports):
-            off = -hw + (i+1) * (2*hw / (ports+1))
-            ax.add_patch(Circle(_rot(cx + off, cy, cx, cy, ang), 0.05, ec="black", fc="white", lw=D, zorder=7))
+            off = -hw + (i + 1) * (2 * hw / (ports + 1))
+            ax.add_patch(Circle(_rot(cx + off, cy, cx, cy, ang), 0.05,
+                                ec="black", fc="white", lw=D, zorder=7))
     elif et == EquipmentType.EXPANSION_VESSEL:
         r = min(w, h) / 2
         ax.add_patch(Circle((cx, cy), r, fill=False, ec="black", lw=lw, zorder=6))
-        ax.plot(*zip(*_rot_points([(-r*0.8, r*0.2), (r*0.8, r*0.2)], cx, cy, ang)), color="#0066CC", lw=D*2.0, zorder=7)
+        ax.plot(*zip(*_rot_points([(-r*0.8, r*0.2), (r*0.8, r*0.2)], cx, cy, ang)),
+                color="#0066CC", lw=D*2.0, zorder=7)
     elif et in (EquipmentType.Y_STRAINER, EquipmentType.MESH_FILTER):
-        if et == EquipmentType.Y_STRAINER: pts = _rot_points([(-w*0.4, 0), (0, -h*0.3), (w*0.4, 0), (0, h*0.3)], cx, cy, ang)
-        else: pts = _rot_points([(-w*0.4, -h*0.4), (w*0.4, -h*0.4), (w*0.4, h*0.4), (-w*0.4, h*0.4)], cx, cy, ang)
+        if et == EquipmentType.Y_STRAINER:
+            pts = _rot_points([(-w*0.4, 0), (0, -h*0.3), (w*0.4, 0), (0, h*0.3)], cx, cy, ang)
+        else:
+            pts = _rot_points([(-w*0.4, -h*0.4), (w*0.4, -h*0.4),
+                                (w*0.4, h*0.4), (-w*0.4, h*0.4)], cx, cy, ang)
         ax.add_patch(Polygon(pts, closed=True, fc="white", ec="black", lw=lw, zorder=6))
-    elif et in (EquipmentType.PRESSURE_GAUGE, EquipmentType.THERMOMETER, EquipmentType.FLOW_METER, EquipmentType.HEAT_METER):
+    elif et in (EquipmentType.PRESSURE_GAUGE, EquipmentType.THERMOMETER,
+                EquipmentType.FLOW_METER, EquipmentType.HEAT_METER):
         r = min(w, h) / 2
         ax.add_patch(Circle((cx, cy), r, fill=False, ec="black", lw=lw, zorder=6))
-        lbl = {"pressure_gauge": "P", "thermometer": "T", "flow_meter": "F", "heat_meter": "Q"}.get(et, "")
-        ax.text(cx, cy, lbl, fontproperties=_get_font(12, bold=True, m_per_pt=m_per_pt), ha="center", va="center", color="black", zorder=8)
-    
+        lbl = {"pressure_gauge": "P", "thermometer": "T",
+               "flow_meter": "F", "heat_meter": "Q"}.get(et, "")
+        ax.text(cx, cy, lbl, fontproperties=_get_font(12, bold=True, m_per_pt=m_per_pt),
+                ha="center", va="center", color="black", zorder=8)
+
+    # Register equipment footprint as obstacle
+    if tracker:
+        tracker.register_symbol(cx, cy, max(w, h) / 2)
+
     tag_offset = (h / 2 + 0.35) if et == EquipmentType.MANIFOLD else (max(w, h) / 2 + 0.5)
     if eq.tag:
-        txt, best_pos = eq.tag, _rot(cx, cy + tag_offset, cx, cy, ang)
+        txt = eq.tag
         if tracker:
-            bbox = tracker.text_bounds(best_pos[0], best_pos[1], txt, 10, m_per_pt, va="bottom")
-            if tracker.collides(bbox):
-                best_pos = _rot(cx, cy + tag_offset + 0.7, cx, cy, ang)
-                bbox = tracker.text_bounds(best_pos[0], best_pos[1], txt, 10, m_per_pt, va="bottom")
-            tracker.boxes.append(bbox); tracker.draw_debug(ax, bbox, color="orange")
-        t = ax.text(best_pos[0], best_pos[1], txt, fontproperties=_get_font(10, bold=True, m_per_pt=m_per_pt), ha="center", va="bottom", color="black", zorder=8, bbox=dict(boxstyle="round,pad=0.05", fc="white", lw=0, alpha=0.8))
+            t = tracker.place_label(
+                ax, cx, cy, txt, 10, m_per_pt,
+                base_offset=tag_offset, ideal_angle_deg=ang + 90,
+                ha="center", va="center", color="black", bold=True, zorder=8,
+                bbox_style=dict(boxstyle="round,pad=0.05", fc="white", lw=0, alpha=0.8),
+                draw_leader=True,
+            )
+        else:
+            best_pos = _rot(cx, cy + tag_offset, cx, cy, ang)
+            t = ax.text(best_pos[0], best_pos[1], txt,
+                        fontproperties=_get_font(10, bold=True, m_per_pt=m_per_pt),
+                        ha="center", va="bottom", color="black", zorder=8,
+                        bbox=dict(boxstyle="round,pad=0.05", fc="white", lw=0, alpha=0.8))
         _add_text_halo(t)
     if eq.label:
-        txt, best_pos = eq.label, _rot(cx, cy - tag_offset, cx, cy, ang)
+        txt = eq.label
         if tracker:
-            bbox = tracker.text_bounds(best_pos[0], best_pos[1], txt, 8, m_per_pt, va="top")
-            if tracker.collides(bbox):
-                best_pos = _rot(cx, cy - tag_offset - 0.8, cx, cy, ang)
-                bbox = tracker.text_bounds(best_pos[0], best_pos[1], txt, 8, m_per_pt, va="top")
-            tracker.boxes.append(bbox); tracker.draw_debug(ax, bbox, color="purple")
-        t = ax.text(best_pos[0], best_pos[1], txt, fontproperties=_get_font(8, m_per_pt=m_per_pt), ha="center", va="top", color="#333333", zorder=8)
+            t = tracker.place_label(
+                ax, cx, cy, txt, 8, m_per_pt,
+                base_offset=tag_offset + 0.5, ideal_angle_deg=ang + 270,
+                ha="center", va="center", color="#333333", bold=False, zorder=8,
+                draw_leader=True,
+            )
+        else:
+            best_pos = _rot(cx, cy - tag_offset, cx, cy, ang)
+            t = ax.text(best_pos[0], best_pos[1], txt,
+                        fontproperties=_get_font(8, m_per_pt=m_per_pt),
+                        ha="center", va="top", color="#333333", zorder=8)
         _add_text_halo(t)
 
 def _draw_instrument_bubble(ax, instr: InstrumentSymbol, m_per_pt: float):
@@ -438,12 +626,21 @@ def render_pipeline_schematic(plan: PipelineSchematic, output_format: str = "png
     ax.set_ylim(cy_data - half_h_paper, cy_data + half_h_paper)
     ax.set_aspect("equal"); ax.axis("off")
     tracker = LabelTracker(debug=False)
-    for p in plan.pipes: _draw_pipe_segment(ax, p, m_per_pt, tracker)
-    for f in plan.fittings: _draw_fitting_symbol(ax, f, m_per_pt)
-    for v in plan.valves: _draw_valve_symbol(ax, v, m_per_pt, tracker)
-    for e in plan.equipment: _draw_equipment_symbol(ax, e, m_per_pt, tracker)
-    for i in plan.instruments: _draw_instrument_bubble(ax, i, m_per_pt)
-    for s in plan.supports: _draw_pipe_support(ax, s, m_per_pt)
+    # Pass 1: draw all pipes and register them as obstacles (no labels yet)
+    for p in plan.pipes:
+        _draw_pipe_segment(ax, p, m_per_pt, tracker)
+    # Pass 2: register equipment/valve footprints before placing any labels
+    for f in plan.fittings:
+        _draw_fitting_symbol(ax, f, m_per_pt)
+    for s in plan.supports:
+        _draw_pipe_support(ax, s, m_per_pt)
+    # Pass 3: draw symbols with smart label auto-routing
+    for v in plan.valves:
+        _draw_valve_symbol(ax, v, m_per_pt, tracker)
+    for e in plan.equipment:
+        _draw_equipment_symbol(ax, e, m_per_pt, tracker)
+    for i in plan.instruments:
+        _draw_instrument_bubble(ax, i, m_per_pt)
     if plan.show_legend: _draw_symbol_legend(fig, plan, pw_mm, ph_mm)
     _draw_stamp(fig, plan, "NTS", pw_mm, ph_mm, plan.language)
     buf = io.BytesIO()
