@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 MEDIA_STYLES: Dict[str, Dict] = {
     PipeMedium.HEATING_SUPPLY: {"color": "#CC0000", "ls": TYPE_01, "label_ru": "Подача тепл.", "label_en": "Heating Supply", "label_uk": "Подача тепл."},
     PipeMedium.HEATING_RETURN: {"color": "#0000CC", "ls": TYPE_01, "label_ru": "Обратка тепл.", "label_en": "Heating Return", "label_uk": "Зворотня тепл."},
-    PipeMedium.COLD_WATER:    {"color": "#00AA00", "ls": TYPE_01, "label_ru": "ХВС", "label_en": "Cold Water", "label_uk": "ХВП (Холодна)"},
+    PipeMedium.COLD_WATER:    {"color": "#1565C0", "ls": TYPE_01, "label_ru": "ХВС", "label_en": "Cold Water", "label_uk": "ХВП (Холодна)"},
     PipeMedium.HOT_WATER:     {"color": "#D32F2F", "ls": TYPE_02, "label_ru": "ГВС", "label_en": "Hot Water", "label_uk": "ГВП (Гаряча)"},
     PipeMedium.GAS:           {"color": "#CCAA00", "ls": TYPE_01, "label_ru": "Газ", "label_en": "Gas", "label_uk": "Газ"},
     PipeMedium.STEAM:         {"color": "#888888", "ls": TYPE_01, "label_ru": "Пар", "label_en": "Steam", "label_uk": "Пара"},
@@ -266,15 +266,15 @@ def _draw_pipe_segment(ax, pipe: PipeSegment, m_per_pt: float, tracker: Optional
         txt = f"DN{pipe.nominal_diameter}"
         if tracker:
             t = tracker.place_label(
-                ax, mx, my, txt, 8, m_per_pt,
-                base_offset=0.5, ideal_angle_deg=ideal_ang,
+                ax, mx, my, txt, 9, m_per_pt,
+                base_offset=0.65, ideal_angle_deg=ideal_ang,
                 ha="center", va="center", color=color, zorder=5,
                 draw_leader=False,  # DN labels don't need leader lines
             )
         else:
             nx, ny = -(y2 - y1) / seg_len, (x2 - x1) / seg_len
-            t = ax.text(mx + nx * 0.5, my + ny * 0.5, txt,
-                        fontproperties=_get_font(8, m_per_pt=m_per_pt),
+            t = ax.text(mx + nx * 0.65, my + ny * 0.65, txt,
+                        fontproperties=_get_font(9, m_per_pt=m_per_pt),
                         ha="center", va="center", color=color, zorder=5)
         _add_text_halo(t)
 
@@ -316,22 +316,22 @@ def _draw_valve_symbol(ax, valve: ValveSymbol, m_per_pt: float, tracker: Optiona
         tracker.register_symbol(cx, cy, s)
 
     if valve.tag:
-        tag_offset = max(0.6, s * 2.8)
+        tag_offset = max(0.85, s * 3.5)
         txt = str(valve.tag)
         if tracker:
             t = tracker.place_label(
-                ax, cx, cy, txt, 10, m_per_pt,
+                ax, cx, cy, txt, 12, m_per_pt,
                 base_offset=tag_offset, ideal_angle_deg=ang + 90,
                 ha="center", va="center", color="black", bold=True, zorder=8,
-                bbox_style=dict(boxstyle="round,pad=0.1", fc="white", lw=0, alpha=0.9),
+                bbox_style=dict(boxstyle="round,pad=0.15", fc="white", lw=0, alpha=0.92),
                 draw_leader=True,
             )
         else:
             best_pos = _rot(cx, cy + tag_offset, cx, cy, ang)
             t = ax.text(best_pos[0], best_pos[1], txt,
-                        fontproperties=_get_font(10, bold=True, m_per_pt=m_per_pt),
+                        fontproperties=_get_font(12, bold=True, m_per_pt=m_per_pt),
                         ha="center", va="bottom", color="black", zorder=8,
-                        bbox=dict(boxstyle="round,pad=0.1", fc="white", lw=0, alpha=0.9))
+                        bbox=dict(boxstyle="round,pad=0.15", fc="white", lw=0, alpha=0.92))
         _add_text_halo(t)
 
 
@@ -406,47 +406,47 @@ def _draw_equipment_symbol(ax, eq: EquipmentSymbol, m_per_pt: float, tracker: Op
     if tracker:
         tracker.register_symbol(cx, cy, max(w, h) / 2)
 
-    tag_offset = (h / 2 + 0.35) if et == EquipmentType.MANIFOLD else (max(w, h) / 2 + 0.5)
+    tag_offset = (h / 2 + 0.5) if et == EquipmentType.MANIFOLD else (max(w, h) / 2 + 0.7)
     if eq.tag:
         txt = eq.tag
         if tracker:
             t = tracker.place_label(
-                ax, cx, cy, txt, 10, m_per_pt,
+                ax, cx, cy, txt, 12, m_per_pt,
                 base_offset=tag_offset, ideal_angle_deg=ang + 90,
                 ha="center", va="center", color="black", bold=True, zorder=8,
-                bbox_style=dict(boxstyle="round,pad=0.05", fc="white", lw=0, alpha=0.8),
+                bbox_style=dict(boxstyle="round,pad=0.12", fc="white", lw=0, alpha=0.92),
                 draw_leader=True,
             )
         else:
             best_pos = _rot(cx, cy + tag_offset, cx, cy, ang)
             t = ax.text(best_pos[0], best_pos[1], txt,
-                        fontproperties=_get_font(10, bold=True, m_per_pt=m_per_pt),
+                        fontproperties=_get_font(12, bold=True, m_per_pt=m_per_pt),
                         ha="center", va="bottom", color="black", zorder=8,
-                        bbox=dict(boxstyle="round,pad=0.05", fc="white", lw=0, alpha=0.8))
+                        bbox=dict(boxstyle="round,pad=0.12", fc="white", lw=0, alpha=0.92))
         _add_text_halo(t)
     if eq.label:
         txt = eq.label
         if tracker:
             t = tracker.place_label(
-                ax, cx, cy, txt, 8, m_per_pt,
-                base_offset=tag_offset + 0.5, ideal_angle_deg=ang + 270,
-                ha="center", va="center", color="#333333", bold=False, zorder=8,
+                ax, cx, cy, txt, 9, m_per_pt,
+                base_offset=tag_offset + 0.7, ideal_angle_deg=ang + 270,
+                ha="center", va="center", color="#222222", bold=False, zorder=8,
                 draw_leader=True,
             )
         else:
             best_pos = _rot(cx, cy - tag_offset, cx, cy, ang)
             t = ax.text(best_pos[0], best_pos[1], txt,
-                        fontproperties=_get_font(8, m_per_pt=m_per_pt),
-                        ha="center", va="top", color="#333333", zorder=8)
+                        fontproperties=_get_font(9, m_per_pt=m_per_pt),
+                        ha="center", va="top", color="#222222", zorder=8)
         _add_text_halo(t)
 
 def _draw_instrument_bubble(ax, instr: InstrumentSymbol, m_per_pt: float):
-    cx, cy, r, lw = instr.center_pt.x, instr.center_pt.y, 0.4, D_SYMBOL
+    cx, cy, r, lw = instr.center_pt.x, instr.center_pt.y, 0.5, D_SYMBOL
     tag = f"{instr.measured_variable}{instr.suffix}-{instr.tag_number}"
     if instr.in_dcs: ax.add_patch(Rectangle((cx - r, cy - r), 2 * r, 2 * r, fill=False, ec="black", lw=lw, zorder=6))
     ax.add_patch(Circle((cx, cy), r, fill=False, ec="black", lw=lw, zorder=7))
-    ax.plot([cx, cx], [cy - r * 1.5, cy - r], color="black", lw=D, zorder=5)
-    t = ax.text(cx, cy, tag, fontproperties=_get_font(8, bold=True, m_per_pt=m_per_pt), ha="center", va="center", color="black", zorder=8)
+    ax.plot([cx, cx], [cy - r * 1.6, cy - r], color="black", lw=D, zorder=5)
+    t = ax.text(cx, cy, tag, fontproperties=_get_font(9, bold=True, m_per_pt=m_per_pt), ha="center", va="center", color="black", zorder=8)
     _add_text_halo(t)
 
 def _draw_fitting_symbol(ax, fitting: FittingSymbol, m_per_pt: float):
@@ -616,7 +616,7 @@ def render_pipeline_schematic(plan: PipelineSchematic, output_format: str = "png
     draw_w_mm, draw_h_mm = pw_mm - MARGIN_LEFT - 125.0, ph_mm - MARGIN_OTHER * 2
     
     # Use 30% padding to ensure labels don't spill out
-    m_per_mm = max(data_w / draw_w_mm, data_h / draw_h_mm) * 1.3
+    m_per_mm = max(data_w / draw_w_mm, data_h / draw_h_mm) * 1.5
     m_per_pt = m_per_mm / MM_TO_PT
     
     ax = fig.add_axes([MARGIN_LEFT/pw_mm, MARGIN_OTHER/ph_mm, draw_w_mm/pw_mm, draw_h_mm/ph_mm])
